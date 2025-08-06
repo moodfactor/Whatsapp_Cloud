@@ -185,6 +185,7 @@ return [
         /*
          * Package Service Providers...
          */
+        BiztechEG\WhatsAppCloudApi\Providers\WhatsAppServiceProvider::class,
 
         /*
          * Application Service Providers...

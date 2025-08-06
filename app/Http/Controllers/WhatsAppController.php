@@ -297,4 +297,132 @@ class WhatsAppController extends BaseController
             default => 'file'
         };
     }
+
+    /**
+     * Handle WhatsApp webhook verification and message reception
+     */
+    public function webhook(Request $request)
+    {
+        // Handle GET request for webhook verification (Meta requirement)
+        if ($request->isMethod('GET')) {
+            $verifyToken = config('whatsapp.webhook_secret', 'your-verify-token');
+            $mode = $request->query('hub_mode');
+            $token = $request->query('hub_verify_token');
+            $challenge = $request->query('hub_challenge');
+
+            if ($mode === 'subscribe' && $token === $verifyToken) {
+                return response($challenge, 200)
+                    ->header('Content-Type', 'text/plain');
+            } else {
+                return response('Forbidden', 403);
+            }
+        }
+
+        // Handle POST request for incoming messages
+        if ($request->isMethod('POST')) {
+            $payload = $request->all();
+            
+            // Log incoming webhook for debugging
+            \Log::info('WhatsApp webhook received:', $payload);
+            
+            // Verify webhook signature if configured
+            $webhookSecret = config('whatsapp.webhook_secret');
+            if ($webhookSecret) {
+                $signature = $request->header('X-Hub-Signature-256');
+                if ($signature) {
+                    $expectedSignature = 'sha256=' . hash_hmac('sha256', $request->getContent(), $webhookSecret);
+                    if (!hash_equals($expectedSignature, $signature)) {
+                        \Log::warning('WhatsApp webhook signature verification failed');
+                        return response('Unauthorized', 401);
+                    }
+                }
+            }
+
+            // Process the webhook payload
+            if (isset($payload['entry'])) {
+                foreach ($payload['entry'] as $entry) {
+                    if (isset($entry['changes'])) {
+                        foreach ($entry['changes'] as $change) {
+                            if ($change['field'] === 'messages') {
+                                $this->processMessage($change['value']);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            return response()->json(['status' => 'success'], 200);
+        }
+
+        return response('Method not allowed', 405);
+    }
+
+    /**
+     * Process incoming WhatsApp message
+     */
+    private function processMessage(array $messageData)
+    {
+        try {
+            if (isset($messageData['messages'])) {
+                foreach ($messageData['messages'] as $message) {
+                    $phoneNumber = $message['from'] ?? null;
+                    $messageText = $message['text']['body'] ?? null;
+                    $messageType = $message['type'] ?? 'text';
+                    $timestamp = $message['timestamp'] ?? time();
+
+                    if ($phoneNumber) {
+                        // Find or create conversation
+                        $conversation = Conversation::firstOrCreate(
+                            ['phone_number' => $phoneNumber],
+                            [
+                                'contact_name' => $phoneNumber,
+                                'last_message' => $messageText ?: '[' . ucfirst($messageType) . ']',
+                                'last_msg_time' => now(),
+                                'status' => 'active'
+                            ]
+                        );
+
+                        // Create message record
+                        WhatsAppInteractionMessage::create([
+                            'conversation_id' => $conversation->id,
+                            'message' => $messageText ?: '[' . ucfirst($messageType) . ']',
+                            'nature' => 'received',
+                            'status' => 'delivered',
+                            'time_sent' => now(),
+                            'message_data' => json_encode($message)
+                        ]);
+
+                        // Update conversation
+                        $conversation->update([
+                            'last_message' => $messageText ?: '[' . ucfirst($messageType) . ']',
+                            'last_msg_time' => now()
+                        ]);
+
+                        \Log::info("Processed WhatsApp message from {$phoneNumber}");
+                    }
+                }
+            }
+
+            // Process status updates
+            if (isset($messageData['statuses'])) {
+                foreach ($messageData['statuses'] as $status) {
+                    $messageId = $status['id'] ?? null;
+                    $statusType = $status['status'] ?? null;
+                    
+                    if ($messageId && $statusType) {
+                        // Update message status if we have it
+                        WhatsAppInteractionMessage::where('whatsapp_message_id', $messageId)
+                            ->update(['status' => $statusType]);
+                        
+                        \Log::info("Updated message {$messageId} status to {$statusType}");
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error processing WhatsApp message: ' . $e->getMessage(), [
+                'data' => $messageData,
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
 }

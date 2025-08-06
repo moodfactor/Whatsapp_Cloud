@@ -6,6 +6,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ConversationManagementController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 // =================== WhatsApp Microservice Routes ===================
 
@@ -83,9 +84,29 @@ Route::middleware(['web'])->group(function () {
 
 // =================== WHATSAPP WEBHOOK ROUTES ===================
 
-// WhatsApp webhook routes (no authentication needed)
-Route::match(['GET', 'POST'], '/whatsapp/webhook', [WhatsAppController::class, 'webhook'])
-    ->name('whatsapp.webhook');
+// Test endpoint
+Route::get('/test-webhook', function() {
+    return 'Webhook test OK';
+});
+
+// WhatsApp webhook verification (GET)
+Route::get('/whatsapp/webhook', function(Request $request) {
+    $verifyToken = '12345678';
+    $mode = $request->query('hub_mode');
+    $token = $request->query('hub_verify_token');
+    $challenge = $request->query('hub_challenge');
+
+    if ($mode === 'subscribe' && $token === $verifyToken) {
+        return response($challenge, 200)->header('Content-Type', 'text/plain');
+    }
+    return response('Forbidden', 403);
+});
+
+// WhatsApp webhook messages (POST)
+Route::post('/whatsapp/webhook', function(Request $request) {
+    Log::info('WhatsApp webhook POST:', $request->all());
+    return response()->json(['status' => 'success'], 200);
+});
 
 // =================== SYSTEM ROUTES ===================
 

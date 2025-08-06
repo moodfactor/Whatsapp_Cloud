@@ -5,7 +5,7 @@ return [
     'api_url' => env('WHATSAPP_API_URL', 'https://graph.facebook.com/v16.0/'),
     'access_token' => env('WHATSAPP_ACCESS_TOKEN', null),
     'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID', null),
-    'webhook_secret' => env('WHATSAPP_WEBHOOK_SECRET', null),
+    'webhook_secret' => env('WHATSAPP_WEBHOOK_VERIFY_TOKEN', env('WHATSAPP_WEBHOOK_SECRET', null)),
 
     'retry' => [
         'max_attempts' => env('WHATSAPP_RETRY_MAX', 3),

@@ -18,11 +18,16 @@ class WhatsAppServiceProvider extends ServiceProvider
     {
 
         // Merge package configuration.
-        $this->mergeConfigFrom(__DIR__.'/../../config/whatsapp.php', 'whatsappApi');
+        $this->mergeConfigFrom(__DIR__.'/../../config/whatsapp.php', 'whatsapp');
 
         // Bind the default WhatsAppClient using the factory with the 'default' account.
         $this->app->singleton(WhatsAppClient::class, function ($app) {
-            return WhatsAppClientFactory::create('default');
+            $config = $app->make('config')->get('whatsapp.accounts.default', [
+                'api_url' => 'https://graph.facebook.com/v16.0/',
+                'access_token' => null,
+                'phone_number_id' => null,
+            ]);
+            return new WhatsAppClient($config);
         });
 
         // Bind InteractiveSessionManager so it can be replaced if necessary.
