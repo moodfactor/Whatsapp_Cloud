@@ -29,7 +29,7 @@ Route::middleware(['web', 'auth:whatsapp_admin'])->prefix('admin')->group(functi
     Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
     
     // User Management (admin and super_admin only)
-    Route::group(function () {
+    Route::group([], function () {
         Route::get('/users', [AdminController::class, 'users'])->name('admin.users');
         Route::get('/users/create', [AdminController::class, 'createUser'])->name('admin.users.create');
         Route::post('/users', [AdminController::class, 'storeUser'])->name('admin.users.store');
