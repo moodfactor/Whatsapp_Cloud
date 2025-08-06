@@ -19,15 +19,28 @@ use App\Http\Controllers\InternationalSpecialtiesController;
 |
 */
 
-// WhatsApp Chat Admin API Routes - using web middleware for session auth
+// WhatsApp API Routes - Enhanced with new functionality
+Route::middleware(['web'])->prefix('whatsapp')->group(function () {
+    // Conversation management
+    Route::get('/conversations', [\App\Http\Controllers\WhatsAppController::class, 'getConversations']);
+    Route::get('/messages/{conversationId}', [\App\Http\Controllers\WhatsAppController::class, 'getMessages']);
+    
+    // Message sending
+    Route::post('/send-message', [\App\Http\Controllers\WhatsAppController::class, 'sendMessage']);
+    Route::post('/upload-media', [\App\Http\Controllers\WhatsAppController::class, 'uploadMedia']);
+    
+    // Legacy compatibility routes
+    Route::get('/interactions', [\App\Http\Controllers\WhatsAppController::class, 'getConversations']);
+    Route::get('/interactions/{id}/messages', [\App\Http\Controllers\WhatsAppController::class, 'getMessages']);
+});
+
+// Legacy chat controller routes (for backward compatibility)
 Route::middleware(['web'])->group(function () {
     Route::get('/conversations', [ChatController::class, 'getConversations']);
     Route::get('/conversations/{id}', [ChatController::class, 'getConversation']);
     Route::post('/conversations/{id}/claim', [ChatController::class, 'claimConversation']);
     Route::get('/conversations/updates', [ChatController::class, 'getConversationUpdates']);
     Route::get('/user/role', [ChatController::class, 'getUserRole']);
-    Route::get('/whatsapp/interactions', [ChatController::class, 'getConversations']);
-    Route::get('/whatsapp/interactions/{id}/messages', [ChatController::class, 'getMessages']);
 });
 
 

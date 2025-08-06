@@ -4,22 +4,297 @@ namespace App\Http\Controllers;
 
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use App\Models\Conversation;
+use App\Models\WhatsAppInteractionMessage;
+use App\Services\CountryService;
+use App\Services\MetaWhatsappService;
 
 class WhatsAppController extends BaseController
 {
+    protected $whatsappService;
+
+    public function __construct(MetaWhatsappService $whatsappService)
+    {
+        $this->whatsappService = $whatsappService;
+    }
+
     public function dashboard()
     {
+        $user = $this->getCurrentUser();
+        
         return view("whatsapp.dashboard", [
-            "user" => [
-                "name" => "Admin User",
-                "permissions" => [
-                    "role_name" => "Super Admin",
-                    "can_see_all" => true,
-                    "can_assign" => true,
-                    "can_delete" => true,
-                    "can_see_phone" => true
-                ]
+            "user" => $user
+        ]);
+    }
+
+    public function getConversations(Request $request)
+    {
+        $user = $this->getCurrentUser();
+        
+        $query = Conversation::query();
+        
+        // Apply role-based filtering
+        if (!$user['permissions']['can_see_all']) {
+            $query->where('assigned_to', $user['id']);
+        }
+        
+        $conversations = $query->with(['messages' => function($q) {
+            $q->latest('time_sent')->limit(1);
+        }])->orderBy('last_msg_time', 'desc')->get();
+        
+        // Format conversations for API response
+        $formattedConversations = $conversations->map(function($conversation) use ($user) {
+            $phoneDisplay = CountryService::formatPhoneForDisplay(
+                $conversation->decrypted_phone,
+                $conversation->contact_name,
+                $user['permissions']['can_see_phone']
+            );
+            
+            return [
+                'id' => $conversation->id,
+                'contact_name' => $phoneDisplay['display_name'],
+                'contact_phone' => $phoneDisplay['display_phone'],
+                'country_flag' => $phoneDisplay['country_flag'],
+                'country_name' => $phoneDisplay['country_name'],
+                'is_arab' => $phoneDisplay['is_arab'],
+                'last_message' => $conversation->last_message ?? 'No messages yet',
+                'last_msg_time' => $conversation->last_msg_time,
+                'unread' => $conversation->unread ?? 0,
+                'status' => $conversation->status ?? 'new',
+                'assigned_to' => $conversation->assigned_to,
+                'can_see_full_phone' => $user['permissions']['can_see_phone'],
+                'full_phone' => $user['permissions']['can_see_phone'] ? $phoneDisplay['full_phone'] : null
+            ];
+        });
+        
+        return response()->json([
+            'conversations' => $formattedConversations,
+            'user_permissions' => $user['permissions']
+        ]);
+    }
+
+    public function getMessages(Request $request, $conversationId)
+    {
+        $user = $this->getCurrentUser();
+        
+        $conversation = Conversation::findOrFail($conversationId);
+        
+        // Check if user can access this conversation
+        if (!$user['permissions']['can_see_all'] && $conversation->assigned_to !== $user['id']) {
+            return response()->json(['error' => 'Access denied'], 403);
+        }
+        
+        $messages = WhatsAppInteractionMessage::where('interaction_id', $conversationId)
+            ->orderBy('time_sent', 'asc')
+            ->get()
+            ->map(function($message) {
+                return [
+                    'id' => $message->id,
+                    'text' => $message->message,
+                    'type' => $message->nature, // 'sent' or 'received'
+                    'message_type' => $message->type ?? 'text',
+                    'time' => $message->time_sent->format('H:i'),
+                    'status' => $message->status ?? 'delivered',
+                    'media_url' => $message->url ?? null
+                ];
+            });
+        
+        $phoneDisplay = CountryService::formatPhoneForDisplay(
+            $conversation->decrypted_phone,
+            $conversation->contact_name,
+            $user['permissions']['can_see_phone']
+        );
+        
+        return response()->json([
+            'messages' => $messages,
+            'conversation' => [
+                'id' => $conversation->id,
+                'contact_name' => $phoneDisplay['display_name'],
+                'contact_phone' => $phoneDisplay['display_phone'],
+                'country_flag' => $phoneDisplay['country_flag'],
+                'country_name' => $phoneDisplay['country_name'],
+                'status' => $conversation->status
             ]
         ]);
+    }
+
+    public function sendMessage(Request $request)
+    {
+        $user = $this->getCurrentUser();
+        
+        $request->validate([
+            'conversation_id' => 'required|exists:whatsapp_interactions,id',
+            'message' => 'required|string|max:1000'
+        ]);
+        
+        $conversation = Conversation::findOrFail($request->conversation_id);
+        
+        // Check if user can access this conversation
+        if (!$user['permissions']['can_see_all'] && $conversation->assigned_to !== $user['id']) {
+            return response()->json(['error' => 'Access denied'], 403);
+        }
+        
+        try {
+            // Send message via WhatsApp API
+            $result = $this->whatsappService->sendMessage(
+                $conversation->decrypted_phone,
+                $request->message
+            );
+            
+            // Store message in database
+            $message = WhatsAppInteractionMessage::create([
+                'interaction_id' => $conversation->id,
+                'message' => $request->message,
+                'type' => 'text',
+                'nature' => 'sent',
+                'status' => 'sent',
+                'time_sent' => now()
+            ]);
+            
+            // Update conversation last message
+            $conversation->update([
+                'last_message' => $request->message,
+                'last_msg_time' => now()
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'message' => [
+                    'id' => $message->id,
+                    'text' => $message->message,
+                    'type' => 'sent',
+                    'time' => $message->time_sent->format('H:i'),
+                    'status' => 'sent'
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to send message: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function uploadMedia(Request $request)
+    {
+        $user = $this->getCurrentUser();
+        
+        $request->validate([
+            'conversation_id' => 'required|exists:whatsapp_interactions,id',
+            'media' => 'required|file|mimes:jpg,jpeg,png,gif,pdf,doc,docx,mp3,mp4,wav|max:16384' // 16MB max
+        ]);
+        
+        $conversation = Conversation::findOrFail($request->conversation_id);
+        
+        // Check permissions
+        if (!$user['permissions']['can_see_all'] && $conversation->assigned_to !== $user['id']) {
+            return response()->json(['error' => 'Access denied'], 403);
+        }
+        
+        try {
+            // Store file
+            $file = $request->file('media');
+            $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+            $path = $file->storeAs('whatsapp', $filename, 'public');
+            $fullUrl = asset('uploads/' . $path);
+            
+            // Send media via WhatsApp API
+            $result = $this->whatsappService->sendMedia(
+                $conversation->decrypted_phone,
+                $fullUrl,
+                $file->getClientOriginalName()
+            );
+            
+            // Store message in database
+            $message = WhatsAppInteractionMessage::create([
+                'interaction_id' => $conversation->id,
+                'message' => $file->getClientOriginalName(),
+                'type' => $this->getMediaType($file->getClientOriginalExtension()),
+                'nature' => 'sent',
+                'status' => 'sent',
+                'url' => $fullUrl,
+                'time_sent' => now()
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'message' => [
+                    'id' => $message->id,
+                    'text' => $file->getClientOriginalName(),
+                    'type' => 'sent',
+                    'message_type' => $message->type,
+                    'time' => $message->time_sent->format('H:i'),
+                    'media_url' => $fullUrl,
+                    'status' => 'sent'
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to send media: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    private function getCurrentUser(): array
+    {
+        // This should be replaced with actual authentication logic
+        $admin = Auth::guard('whatsapp_admin')->user();
+        
+        if ($admin) {
+            return [
+                'id' => $admin->id,
+                'name' => $admin->name,
+                'email' => $admin->email,
+                'role' => $admin->role ?? 'agent',
+                'permissions' => [
+                    'role_name' => $this->getRoleName($admin->role ?? 'agent'),
+                    'can_see_all' => in_array($admin->role, ['super_admin', 'admin']),
+                    'can_assign' => in_array($admin->role, ['super_admin', 'admin', 'supervisor']),
+                    'can_delete' => in_array($admin->role, ['super_admin', 'admin']),
+                    'can_see_phone' => ($admin->role === 'super_admin')
+                ]
+            ];
+        }
+        
+        // Fallback for development/testing
+        return [
+            'id' => 1,
+            'name' => 'Demo User',
+            'email' => 'demo@example.com',
+            'role' => 'agent',
+            'permissions' => [
+                'role_name' => 'Agent',
+                'can_see_all' => false,
+                'can_assign' => false,
+                'can_delete' => false,
+                'can_see_phone' => false
+            ]
+        ];
+    }
+
+    private function getRoleName(string $role): string
+    {
+        return match($role) {
+            'super_admin' => 'Super Admin',
+            'admin' => 'Admin',
+            'supervisor' => 'Supervisor',
+            'agent' => 'Agent',
+            default => 'User'
+        };
+    }
+
+    private function getMediaType(string $extension): string
+    {
+        return match(strtolower($extension)) {
+            'jpg', 'jpeg', 'png', 'gif' => 'image',
+            'mp4', 'avi', 'mov' => 'video',
+            'mp3', 'wav', 'ogg' => 'audio',
+            'pdf', 'doc', 'docx', 'txt' => 'document',
+            default => 'file'
+        };
     }
 }

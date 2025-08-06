@@ -109,3 +109,27 @@ Route::get('/health', function() {
 Route::get('/login', function() {
     return redirect()->route('admin.login');
 })->name('login');
+
+// =================== DEMO ROUTES (for testing different roles) ===================
+
+Route::get('/demo', function() {
+    return view('demo.role-switcher');
+})->name('demo.roles');
+
+Route::prefix('demo')->group(function () {
+    Route::get('/super-admin', [\App\Http\Controllers\DemoController::class, 'dashboard'])
+        ->defaults('role', 'super_admin');
+    Route::get('/admin', [\App\Http\Controllers\DemoController::class, 'dashboard'])
+        ->defaults('role', 'admin');
+    Route::get('/supervisor', [\App\Http\Controllers\DemoController::class, 'dashboard'])
+        ->defaults('role', 'supervisor');
+    Route::get('/agent', [\App\Http\Controllers\DemoController::class, 'dashboard'])
+        ->defaults('role', 'agent');
+});
+
+// Demo API Routes (for testing)
+Route::middleware(['web'])->prefix('api/whatsapp')->group(function () {
+    Route::get('/conversations', [\App\Http\Controllers\DemoController::class, 'getConversations']);
+    Route::get('/messages/{conversationId}', [\App\Http\Controllers\DemoController::class, 'getMessages']);
+    Route::post('/send-message', [\App\Http\Controllers\DemoController::class, 'sendMessage']);
+});

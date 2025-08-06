@@ -16,6 +16,12 @@ class Conversation extends Model
     protected $fillable = ["name", "wa_no", "wa_no_id", "receiver_id", "last_message", "last_msg_time", "time_sent", "type", "type_id", "unread", "assigned_to", "status"];
 
     protected $appends = ['contact_name', 'contact_phone', 'decrypted_phone'];
+    
+    protected $casts = [
+        'last_msg_time' => 'datetime',
+        'time_sent' => 'datetime',
+        'unread' => 'integer'
+    ];
 
     public function messages()
     {
@@ -50,7 +56,8 @@ class Conversation extends Model
      */
     public function getContactPhoneAttribute(): string
     {
-        return $this->wa_no ?? '';
+        // Try both wa_no and receiver_id fields for compatibility
+        return $this->wa_no ?? $this->receiver_id ?? '';
     }
 
     /**
@@ -58,7 +65,13 @@ class Conversation extends Model
      */
     public function getDecryptedPhoneAttribute(): string
     {
-        $phone = $this->wa_no ?? '';
+        // Try both wa_no and receiver_id for compatibility
+        $phone = $this->wa_no ?? $this->receiver_id ?? '';
+        
+        if (empty($phone)) {
+            return '';
+        }
+        
         try {
             // Check if it looks encrypted (base64 pattern)
             if (strpos($phone, 'eyJpdiI6') === 0) {
@@ -142,17 +155,21 @@ class Conversation extends Model
         $normalizedPhone = CountryService::normalizePhoneNumber($phone);
         
         // Try to find existing conversation with this phone number
-        // Check both encrypted and plain text formats
+        // Check both wa_no and receiver_id fields
         $existing = self::where(function($query) use ($normalizedPhone, $phone) {
-            $query->where('contact_phone', $normalizedPhone)
-                  ->orWhere('contact_phone', $phone);
+            $query->where('wa_no', $normalizedPhone)
+                  ->orWhere('wa_no', $phone)
+                  ->orWhere('receiver_id', $normalizedPhone)
+                  ->orWhere('receiver_id', $phone);
             
             // Also try encrypted versions
             try {
                 $encryptedNormalized = Crypt::encryptString($normalizedPhone);
                 $encryptedOriginal = Crypt::encryptString($phone);
-                $query->orWhere('contact_phone', $encryptedNormalized)
-                      ->orWhere('contact_phone', $encryptedOriginal);
+                $query->orWhere('wa_no', $encryptedNormalized)
+                      ->orWhere('wa_no', $encryptedOriginal)
+                      ->orWhere('receiver_id', $encryptedNormalized)
+                      ->orWhere('receiver_id', $encryptedOriginal);
             } catch (\Exception $e) {
                 // Ignore encryption errors
             }
@@ -164,9 +181,10 @@ class Conversation extends Model
 
         // Create new conversation with normalized phone
         return self::create([
-            'contact_phone' => $normalizedPhone, // Store as plain text for consistency
-            'contact_name' => $contactName,
-            'status' => 'new'
+            'receiver_id' => $normalizedPhone, // Store in receiver_id for consistency
+            'name' => $contactName,
+            'status' => 'new',
+            'last_msg_time' => now()
         ]);
     }
 }
