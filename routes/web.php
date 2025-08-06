@@ -23,13 +23,13 @@ Route::post('/admin/logout', [AdminController::class, 'logout'])->name('admin.lo
 
 // =================== PROTECTED ADMIN ROUTES ===================
 
-Route::middleware(['web', 'auth:admin'])->prefix('admin')->group(function () {
+Route::middleware(['web', 'auth:whatsapp_admin'])->prefix('admin')->group(function () {
     
     // Dashboard
     Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
     
-    // User Management (requires manage_users permission)
-    Route::middleware(['auth:admin','can:manage_users'])->group(function () {
+    // User Management (admin and super_admin only)
+    Route::group(function () {
         Route::get('/users', [AdminController::class, 'users'])->name('admin.users');
         Route::get('/users/create', [AdminController::class, 'createUser'])->name('admin.users.create');
         Route::post('/users', [AdminController::class, 'storeUser'])->name('admin.users.store');
@@ -112,9 +112,20 @@ Route::get('/login', function() {
 
 // =================== DEMO ROUTES (for testing different roles) ===================
 
+// Demo and testing routes
 Route::get('/demo', function() {
     return view('demo.role-switcher');
 })->name('demo.roles');
+
+Route::get('/admin-demo', function() {
+    return redirect()->route('admin.login')->with('info', 
+        'Use these demo credentials:<br>' .
+        '• <strong>Super Admin:</strong> admin@connect.al-najjarstore.com / admin123<br>' .
+        '• <strong>Admin:</strong> whatsapp-admin@connect.al-najjarstore.com / whatsapp123<br>' .
+        '• <strong>Supervisor:</strong> supervisor@connect.al-najjarstore.com / supervisor123<br>' .
+        '• <strong>Agent:</strong> agent@connect.al-najjarstore.com / agent123'
+    );
+})->name('admin.demo');
 
 Route::prefix('demo')->group(function () {
     Route::get('/super-admin', [\App\Http\Controllers\DemoController::class, 'dashboard'])

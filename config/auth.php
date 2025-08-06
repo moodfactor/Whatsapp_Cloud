@@ -46,6 +46,12 @@ return [
             'driver' => 'session',
             'provider' => 'admins',
         ],
+        
+        'whatsapp_admin' => [
+            'driver' => 'session',
+            'provider' => 'whatsapp_admins',
+        ],
+        
         'user' => [
             'driver' => 'session',
             'provider' => 'users',
@@ -80,6 +86,10 @@ return [
             'model' => App\Models\User::class,
         ],
         'admins' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\WhatsappAdmin::class,
+        ],
+        'whatsapp_admins' => [
             'driver' => 'eloquent',
             'model' => App\Models\WhatsappAdmin::class,
         ]

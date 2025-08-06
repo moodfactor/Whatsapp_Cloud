@@ -306,33 +306,38 @@
         
         <nav class="nav-menu">
             <div class="nav-item">
-                <a href="#" class="nav-link active">
+                <a href="{{ route('admin.dashboard') }}" class="nav-link active">
                     <i class="fas fa-tachometer-alt"></i> Dashboard
                 </a>
             </div>
             <div class="nav-item">
-                <a href="#" class="nav-link">
+                <a href="{{ route('admin.conversations') }}" class="nav-link">
                     <i class="fas fa-comments"></i> Conversations
                 </a>
             </div>
+            @if(in_array($admin->role ?? 'agent', ['super_admin', 'admin']))
             <div class="nav-item">
-                <a href="#" class="nav-link">
+                <a href="{{ route('admin.users') }}" class="nav-link">
                     <i class="fas fa-users"></i> Users
                 </a>
             </div>
+            @endif
             <div class="nav-item">
-                <a href="/dashboard" class="nav-link">
+                <a href="{{ route('whatsapp.dashboard') }}" class="nav-link">
                     <i class="fab fa-whatsapp"></i> WhatsApp Chat
                 </a>
             </div>
         </nav>
         
         <div class="user-info">
-            <div class="user-name">Admin User</div>
-            <div class="user-role">Super Admin</div>
-            <button class="logout-btn">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </button>
+            <div class="user-name">{{ $admin->name ?? 'Admin User' }}</div>
+            <div class="user-role">{{ ucwords(str_replace('_', ' ', $admin->role ?? 'admin')) }}</div>
+            <form action="{{ route('admin.logout') }}" method="POST" style="margin: 0;">
+                @csrf
+                <button type="submit" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </form>
         </div>
     </div>
 
@@ -342,30 +347,33 @@
             <h1>Dashboard</h1>
             <div>
                 <span style="color: #666; font-size: 14px;">
-                    Welcome back, Admin!
+                    Welcome back, {{ $admin->name ?? 'Admin' }}! 
+                    <small>({{ ucwords(str_replace('_', ' ', $admin->role ?? 'admin')) }})</small>
                 </span>
             </div>
         </div>
 
         <!-- Statistics -->
         <div class="stats-grid">
+            @if(in_array($admin->role ?? 'agent', ['super_admin', 'admin']))
             <div class="stat-card">
                 <div class="stat-icon users">
                     <i class="fas fa-users"></i>
                 </div>
                 <div class="stat-info">
-                    <h3>0</h3>
-                    <p>Total Users (0 active)</p>
+                    <h3>{{ $stats['total_users'] ?? 0 }}</h3>
+                    <p>Total Users ({{ $stats['active_users'] ?? 0 }} active)</p>
                 </div>
             </div>
+            @endif
             
             <div class="stat-card">
                 <div class="stat-icon conversations">
                     <i class="fas fa-comments"></i>
                 </div>
                 <div class="stat-info">
-                    <h3>0</h3>
-                    <p>Total Conversations (0 active)</p>
+                    <h3>{{ $stats['total_conversations'] ?? 0 }}</h3>
+                    <p>Total Conversations ({{ $stats['active_conversations'] ?? 0 }} active)</p>
                 </div>
             </div>
             
@@ -374,18 +382,18 @@
                     <i class="fas fa-envelope"></i>
                 </div>
                 <div class="stat-info">
-                    <h3>0</h3>
-                    <p>Total Messages (0 today)</p>
+                    <h3>{{ $stats['total_messages'] ?? 0 }}</h3>
+                    <p>Total Messages ({{ $stats['messages_today'] ?? 0 }} today)</p>
                 </div>
             </div>
             
             <div class="stat-card">
                 <div class="stat-icon active">
-                    <i class="fas fa-bolt"></i>
+                    <i class="fas fa-chart-line"></i>
                 </div>
                 <div class="stat-info">
-                    <h3>0</h3>
-                    <p>Active This Week</p>
+                    <h3>{{ $stats['messages_this_week'] ?? 0 }}</h3>
+                    <p>Messages This Week</p>
                 </div>
             </div>
         </div>
@@ -396,13 +404,33 @@
             <div class="content-card">
                 <div class="card-header">
                     <h3>Recent Conversations</h3>
-                    <a href="#" class="btn btn-primary">View All</a>
+                    <a href="{{ route('admin.conversations') }}" class="btn btn-primary">View All</a>
                 </div>
                 <div class="card-content">
-                    <div class="empty-state">
-                        <i class="fas fa-comments" style="font-size: 48px; color: #ccc; margin-bottom: 10px;"></i>
-                        <p>No conversations yet</p>
-                    </div>
+                    @if(count($recentConversations ?? []) > 0)
+                        @foreach($recentConversations as $conversation)
+                            <div class="conversation-item">
+                                <div class="conversation-name">
+                                    <span style="font-size: 16px; margin-right: 8px;">{{ $conversation['country_flag'] }}</span>
+                                    {{ $conversation['contact_name'] }}
+                                    <span class="status-badge status-{{ $conversation['status'] }}">{{ $conversation['status'] }}</span>
+                                </div>
+                                <div class="conversation-phone">{{ $conversation['contact_phone'] }}</div>
+                                <div class="conversation-message">{{ Str::limit($conversation['last_message'] ?? '', 50) }}</div>
+                                <div class="conversation-time">
+                                    {{ $conversation['last_msg_time'] ? $conversation['last_msg_time']->diffForHumans() : '' }}
+                                    @if($conversation['unread'] > 0)
+                                        <span style="background: #25d366; color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-left: 8px;">{{ $conversation['unread'] }}</span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    @else
+                        <div class="empty-state">
+                            <i class="fas fa-comments" style="font-size: 48px; color: #ccc; margin-bottom: 10px;"></i>
+                            <p>No conversations yet</p>
+                        </div>
+                    @endif
                 </div>
             </div>
 
@@ -410,13 +438,25 @@
             <div class="content-card">
                 <div class="card-header">
                     <h3>Recent Messages</h3>
-                    <a href="#" class="btn btn-primary">View All</a>
+                    <a href="{{ route('whatsapp.dashboard') }}" class="btn btn-primary">View Chat</a>
                 </div>
                 <div class="card-content">
-                    <div class="empty-state">
-                        <i class="fas fa-envelope" style="font-size: 48px; color: #ccc; margin-bottom: 10px;"></i>
-                        <p>No messages yet</p>
-                    </div>
+                    @if(count($recentMessages ?? []) > 0)
+                        @foreach($recentMessages as $message)
+                            <div class="message-item">
+                                <div class="message-direction {{ $message['type'] === 'sent' ? 'message-sent' : 'message-received' }}">
+                                    {{ $message['type'] === 'sent' ? '→ Sent to' : '← Received from' }}: {{ $message['contact_name'] }}
+                                </div>
+                                <div style="color: #333; margin: 3px 0;">{{ Str::limit($message['message'], 60) }}</div>
+                                <div style="color: #999; font-size: 11px;">{{ $message['time_sent']->diffForHumans() }}</div>
+                            </div>
+                        @endforeach
+                    @else
+                        <div class="empty-state">
+                            <i class="fas fa-envelope" style="font-size: 48px; color: #ccc; margin-bottom: 10px;"></i>
+                            <p>No messages yet</p>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>
