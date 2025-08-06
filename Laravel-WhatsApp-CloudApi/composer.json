@@ -1,0 +1,51 @@
+{
+  "name": "BiztechEG/laravel-whatsapp-cloud-api",
+  "description": "A Laravel package for integrating with the WhatsApp Cloud API",
+  "type": "library",
+  "keywords": [
+      "laravel",
+      "whatsapp",
+      "api",
+      "messaging",
+      "cloud"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/BiztechEG/Laravel-WhatsApp-CloudApi",
+  "authors": [
+      {
+          "name": "Amr Abd-Rabou",
+          "email": "amrsoft13@gmail.com"
+      }
+  ],
+  "require": {
+      "php": "^7.3|^8.0",
+      "illuminate/support": "^8.0|^9.0|^10.0",
+      "guzzlehttp/guzzle": "^7.0",
+      "nesbot/carbon": "^2.0"
+  },
+  "require-dev": {
+      "phpunit/phpunit": "^9.0"
+  },
+  "autoload": {
+      "psr-4": {
+          "BiztechEG\\WhatsAppCloudApi\\": "src/"
+      }
+  },
+  "autoload-dev": {
+      "psr-4": {
+          "BiztechEG\\WhatsAppCloudApi\\Tests\\": "tests/"
+      }
+  },
+  "extra": {
+      "laravel": {
+          "providers": [
+              "BiztechEG\\WhatsAppCloudApi\\Providers\\WhatsAppServiceProvider"
+          ],
+          "aliases": {
+              "WhatsApp": "BiztechEG\\WhatsAppCloudApi\\Facades\\WhatsApp"
+          }
+      }
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true
+}
