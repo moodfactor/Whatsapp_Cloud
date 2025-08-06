@@ -12,7 +12,8 @@ class WhatsAppInteractionMessage extends Model
     protected $table = 'whatsapp_interaction_messages';
 
     protected $fillable = [
-        'interaction_id', 'message', 'type', 'nature', 'time_sent', 'status', 'file_url'
+        'interaction_id', 'message', 'type', 'nature', 'time_sent', 'status', 
+        'url', 'filename', 'mime_type', 'file_size', 'whatsapp_message_id', 'metadata'
     ];
 
     public function conversation()

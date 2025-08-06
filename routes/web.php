@@ -89,6 +89,46 @@ Route::get('/test-webhook', function() {
     return 'Webhook test OK';
 });
 
+// Test message creation
+Route::get('/test-message', function() {
+    try {
+        // Create test conversation
+        $conversation = \App\Models\Conversation::findOrCreateByPhone('+201234567890', 'Test User');
+        
+        // Create test message
+        $message = \App\Models\WhatsAppInteractionMessage::create([
+            'interaction_id' => $conversation->id,
+            'message' => 'Test incoming message from webhook',
+            'type' => 'text',
+            'nature' => 'received',
+            'status' => 'delivered',
+            'time_sent' => now(),
+            'whatsapp_message_id' => 'test_' . uniqid(),
+            'metadata' => json_encode(['test' => true])
+        ]);
+        
+        // Update conversation
+        $conversation->update([
+            'last_message' => 'Test incoming message from webhook',
+            'last_msg_time' => now(),
+            'unread' => $conversation->unread + 1
+        ]);
+        
+        return response()->json([
+            'success' => true,
+            'conversation_id' => $conversation->id,
+            'message_id' => $message->id,
+            'conversation' => $conversation->toArray()
+        ]);
+        
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+});
+
 // WhatsApp webhook verification (GET)
 Route::get('/whatsapp/webhook', function(Request $request) {
     $verifyToken = '12345678';
@@ -104,7 +144,83 @@ Route::get('/whatsapp/webhook', function(Request $request) {
 
 // WhatsApp webhook messages (POST)
 Route::post('/whatsapp/webhook', function(Request $request) {
-    Log::info('WhatsApp webhook POST:', $request->all());
+    $payload = $request->all();
+    Log::info('WhatsApp webhook received:', $payload);
+    
+    try {
+        // Process incoming webhook data
+        if (isset($payload['entry'])) {
+            foreach ($payload['entry'] as $entry) {
+                if (isset($entry['changes'])) {
+                    foreach ($entry['changes'] as $change) {
+                        if ($change['field'] === 'messages' && isset($change['value']['messages'])) {
+                            foreach ($change['value']['messages'] as $message) {
+                                $phoneNumber = $message['from'] ?? null;
+                                $messageText = $message['text']['body'] ?? null;
+                                $messageType = $message['type'] ?? 'text';
+                                $messageId = $message['id'] ?? null;
+                                $timestamp = isset($message['timestamp']) ? \Carbon\Carbon::createFromTimestamp($message['timestamp']) : now();
+
+                                if ($phoneNumber) {
+                                    Log::info("Processing message from: {$phoneNumber}");
+                                    
+                                    // Find or create conversation using the improved method
+                                    $conversation = \App\Models\Conversation::findOrCreateByPhone($phoneNumber, $phoneNumber);
+
+                                    Log::info("Found/created conversation ID: {$conversation->id}");
+
+                                    // Create message record
+                                    $messageRecord = \App\Models\WhatsAppInteractionMessage::create([
+                                        'interaction_id' => $conversation->id,
+                                        'message' => $messageText ?: '[' . ucfirst($messageType) . ']',
+                                        'type' => $messageType,
+                                        'nature' => 'received',
+                                        'status' => 'delivered',
+                                        'time_sent' => $timestamp,
+                                        'whatsapp_message_id' => $messageId,
+                                        'metadata' => json_encode($message)
+                                    ]);
+
+                                    Log::info("Created message record ID: {$messageRecord->id}");
+
+                                    // Update conversation with latest message
+                                    $conversation->update([
+                                        'last_message' => $messageText ?: '[' . ucfirst($messageType) . ']',
+                                        'last_msg_time' => $timestamp,
+                                        'status' => 'new',
+                                        'unread' => $conversation->unread + 1
+                                    ]);
+
+                                    Log::info("Successfully processed WhatsApp message from {$phoneNumber}");
+                                }
+                            }
+                        }
+
+                        // Process status updates
+                        if ($change['field'] === 'messages' && isset($change['value']['statuses'])) {
+                            foreach ($change['value']['statuses'] as $status) {
+                                $messageId = $status['id'] ?? null;
+                                $statusType = $status['status'] ?? null;
+                                
+                                if ($messageId && $statusType) {
+                                    \App\Models\WhatsAppInteractionMessage::where('whatsapp_message_id', $messageId)
+                                        ->update(['status' => $statusType]);
+                                    
+                                    Log::info("Updated message {$messageId} status to {$statusType}");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } catch (\Exception $e) {
+        Log::error('Error processing WhatsApp webhook: ' . $e->getMessage(), [
+            'payload' => $payload,
+            'trace' => $e->getTraceAsString()
+        ]);
+    }
+    
     return response()->json(['status' => 'success'], 200);
 });
 
