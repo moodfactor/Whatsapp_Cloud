@@ -38,6 +38,7 @@ class TemplateMessage implements MessageInterface
         $boundTemplate = TemplateManager::bindTemplate($this->templateData, $this->bindings);
 
         return [
+            'messaging_product' => 'whatsapp',
             'to' => $this->recipient,
             'type' => 'template',
             'template' => $boundTemplate,

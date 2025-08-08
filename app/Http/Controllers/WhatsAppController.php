@@ -170,7 +170,12 @@ class WhatsAppController extends BaseController
 
     public function sendMessage(Request $request)
     {
-        $user = $this->getCurrentUser();
+        // Use same authentication pattern as other methods
+        $admin = Auth::guard('whatsapp_admin')->user();
+        
+        if (!$admin) {
+            return response()->json(['error' => 'Not authenticated'], 401);
+        }
         
         $request->validate([
             'conversation_id' => 'required|exists:whatsapp_interactions,id',
@@ -180,16 +185,30 @@ class WhatsAppController extends BaseController
         $conversation = Conversation::findOrFail($request->conversation_id);
         
         // Check if user can access this conversation
-        if (!$user['permissions']['can_see_all'] && $conversation->assigned_to !== $user['id']) {
+        if (!in_array($admin->role, ['super_admin', 'admin']) && $conversation->assigned_to !== $admin->id) {
             return response()->json(['error' => 'Access denied'], 403);
         }
         
         try {
+            \Log::info('Sending WhatsApp message:', [
+                'to' => $conversation->decrypted_phone,
+                'message' => $request->message,
+                'conversation_id' => $conversation->id
+            ]);
+            
             // Send message via WhatsApp API
             $result = $this->whatsappService->sendMessage(
                 $conversation->decrypted_phone,
                 $request->message
             );
+            
+            \Log::info('WhatsApp API Result:', [
+                'success' => !!$result,
+                'result' => $result
+            ]);
+            
+            // Determine status based on API result
+            $status = $result ? 'sent' : 'failed';
             
             // Store message in database
             $message = WhatsAppInteractionMessage::create([
@@ -197,8 +216,9 @@ class WhatsAppController extends BaseController
                 'message' => $request->message,
                 'type' => 'text',
                 'nature' => 'sent',
-                'status' => 'sent',
-                'time_sent' => now()
+                'status' => $status,
+                'time_sent' => now(),
+                'whatsapp_message_id' => $result ? (is_array($result) && isset($result['messages']) ? $result['messages'][0]['id'] ?? null : null) : null
             ]);
             
             // Update conversation last message
@@ -207,18 +227,30 @@ class WhatsAppController extends BaseController
                 'last_msg_time' => now()
             ]);
             
+            if (!$result) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'WhatsApp API returned false - check access token, phone number ID, and account status'
+                ], 500);
+            }
+            
             return response()->json([
                 'success' => true,
                 'message' => [
                     'id' => $message->id,
                     'text' => $message->message,
                     'type' => 'sent',
-                    'time' => $message->time_sent->format('H:i'),
-                    'status' => 'sent'
+                    'time' => \Carbon\Carbon::parse($message->time_sent)->format('H:i'),
+                    'status' => $status
                 ]
             ]);
             
         } catch (\Exception $e) {
+            \Log::error('Send message exception:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return response()->json([
                 'success' => false,
                 'error' => 'Failed to send message: ' . $e->getMessage()

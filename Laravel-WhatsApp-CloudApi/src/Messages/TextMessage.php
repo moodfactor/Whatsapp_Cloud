@@ -15,6 +15,7 @@ class TextMessage implements MessageInterface
     public function toArray(): array
     {
         return [
+            'messaging_product' => 'whatsapp',
             'to' => $this->recipient,
             'type' => 'text',
             'text' => [
