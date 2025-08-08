@@ -19,20 +19,7 @@ use App\Http\Controllers\InternationalSpecialtiesController;
 |
 */
 
-// WhatsApp API Routes - Enhanced with new functionality
-Route::middleware(['web'])->prefix('whatsapp')->group(function () {
-    // Conversation management
-    Route::get('/conversations', [\App\Http\Controllers\WhatsAppController::class, 'getConversations']);
-    Route::get('/messages/{conversationId}', [\App\Http\Controllers\WhatsAppController::class, 'getMessages']);
-    
-    // Message sending
-    Route::post('/send-message', [\App\Http\Controllers\WhatsAppController::class, 'sendMessage']);
-    Route::post('/upload-media', [\App\Http\Controllers\WhatsAppController::class, 'uploadMedia']);
-    
-    // Legacy compatibility routes
-    Route::get('/interactions', [\App\Http\Controllers\WhatsAppController::class, 'getConversations']);
-    Route::get('/interactions/{id}/messages', [\App\Http\Controllers\WhatsAppController::class, 'getMessages']);
-});
+// WhatsApp API Routes moved to web.php for proper session handling
 
 // Legacy chat controller routes (for backward compatibility)
 Route::middleware(['web'])->group(function () {

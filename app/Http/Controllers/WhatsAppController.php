@@ -21,7 +21,27 @@ class WhatsAppController extends BaseController
 
     public function dashboard()
     {
-        $user = $this->getCurrentUser();
+        // Use exact same logic as AdminController
+        $admin = Auth::guard('whatsapp_admin')->user();
+        
+        if (!$admin) {
+            return redirect()->route('admin.login')->with('info', 'Please log in to access WhatsApp chat.');
+        }
+        
+        // Create user array exactly like AdminController expects
+        $user = [
+            'id' => $admin->id,
+            'name' => $admin->name,
+            'email' => $admin->email,
+            'role' => $admin->role,
+            'permissions' => [
+                'role_name' => $this->getRoleName($admin->role),
+                'can_see_all' => in_array($admin->role, ['super_admin', 'admin']),
+                'can_assign' => in_array($admin->role, ['super_admin', 'admin', 'supervisor']),
+                'can_delete' => in_array($admin->role, ['super_admin', 'admin']),
+                'can_see_phone' => ($admin->role === 'super_admin')
+            ]
+        ];
         
         return view("whatsapp.dashboard", [
             "user" => $user
@@ -30,58 +50,87 @@ class WhatsAppController extends BaseController
 
     public function getConversations(Request $request)
     {
-        $user = $this->getCurrentUser();
+        // Use exact same logic as AdminController
+        $admin = Auth::guard('whatsapp_admin')->user();
         
-        $query = Conversation::query();
-        
-        // Apply role-based filtering
-        if (!$user['permissions']['can_see_all']) {
-            $query->where('assigned_to', $user['id']);
+        if (!$admin) {
+            return response()->json(['error' => 'Not authenticated'], 401);
         }
         
-        $conversations = $query->with(['messages' => function($q) {
-            $q->latest('time_sent')->limit(1);
-        }])->orderBy('last_msg_time', 'desc')->get();
+        // Debug logging
+        \Log::info('WhatsApp getConversations Debug:', [
+            'admin_id' => $admin->id,
+            'admin_role' => $admin->role,
+            'admin_data' => $admin->toArray()
+        ]);
         
-        // Format conversations for API response
-        $formattedConversations = $conversations->map(function($conversation) use ($user) {
-            $phoneDisplay = CountryService::formatPhoneForDisplay(
-                $conversation->decrypted_phone,
-                $conversation->contact_name,
-                $user['permissions']['can_see_phone']
-            );
-            
-            return [
-                'id' => $conversation->id,
-                'contact_name' => $phoneDisplay['display_name'],
-                'contact_phone' => $phoneDisplay['display_phone'],
-                'country_flag' => $phoneDisplay['country_flag'],
-                'country_name' => $phoneDisplay['country_name'],
-                'is_arab' => $phoneDisplay['is_arab'],
-                'last_message' => $conversation->last_message ?? 'No messages yet',
-                'last_msg_time' => $conversation->last_msg_time,
-                'unread' => $conversation->unread ?? 0,
-                'status' => $conversation->status ?? 'new',
-                'assigned_to' => $conversation->assigned_to,
-                'can_see_full_phone' => $user['permissions']['can_see_phone'],
-                'full_phone' => $user['permissions']['can_see_phone'] ? $phoneDisplay['full_phone'] : null
-            ];
-        });
+        $query = Conversation::with('assignedTo');
+        
+        // Apply role-based filtering (same as AdminController)
+        if (!in_array($admin->role, ['super_admin', 'admin'])) {
+            $query->where('assigned_to', $admin->id);
+        }
+        
+        $conversations = $query->orderBy('last_msg_time', 'desc')
+            ->get()
+            ->map(function($conversation) use ($admin) {
+                $phoneDisplay = CountryService::formatPhoneForDisplay(
+                    $conversation->decrypted_phone,
+                    $conversation->contact_name,
+                    ($admin->role === 'super_admin')
+                );
+                
+                return [
+                    'id' => $conversation->id,
+                    'contact_name' => $phoneDisplay['display_name'],
+                    'contact_phone' => $phoneDisplay['display_phone'],
+                    'country_flag' => $phoneDisplay['country_flag'],
+                    'country_name' => $phoneDisplay['country_name'],
+                    'is_arab' => $phoneDisplay['is_arab'],
+                    'last_message' => $conversation->last_message ?? 'No messages yet',
+                    'last_msg_time' => $conversation->last_msg_time,
+                    'unread' => $conversation->unread ?? 0,
+                    'status' => $conversation->status ?? 'new',
+                    'assigned_to' => $conversation->assigned_to,
+                    'can_see_full_phone' => ($admin->role === 'super_admin'),
+                    'full_phone' => ($admin->role === 'super_admin') ? $phoneDisplay['full_phone'] : null,
+                    'debug_admin_role' => $admin->role,
+                    'debug_is_super_admin' => ($admin->role === 'super_admin')
+                ];
+            });
+        
+        // Create user permissions exactly like AdminController logic
+        $userPermissions = [
+            'role_name' => $this->getRoleName($admin->role),
+            'can_see_all' => in_array($admin->role, ['super_admin', 'admin']),
+            'can_assign' => in_array($admin->role, ['super_admin', 'admin', 'supervisor']),
+            'can_delete' => in_array($admin->role, ['super_admin', 'admin']),
+            'can_see_phone' => ($admin->role === 'super_admin'),
+            'debug_admin_role' => $admin->role,
+            'debug_role_check' => in_array($admin->role, ['super_admin', 'admin'])
+        ];
+        
+        \Log::info('WhatsApp permissions debug:', $userPermissions);
         
         return response()->json([
-            'conversations' => $formattedConversations,
-            'user_permissions' => $user['permissions']
+            'conversations' => $conversations,
+            'user_permissions' => $userPermissions
         ]);
     }
 
     public function getMessages(Request $request, $conversationId)
     {
-        $user = $this->getCurrentUser();
+        // Use same authentication pattern as getConversations
+        $admin = Auth::guard('whatsapp_admin')->user();
+        
+        if (!$admin) {
+            return response()->json(['error' => 'Not authenticated'], 401);
+        }
         
         $conversation = Conversation::findOrFail($conversationId);
         
-        // Check if user can access this conversation
-        if (!$user['permissions']['can_see_all'] && $conversation->assigned_to !== $user['id']) {
+        // Check if user can access this conversation (same logic as AdminController)
+        if (!in_array($admin->role, ['super_admin', 'admin']) && $conversation->assigned_to !== $admin->id) {
             return response()->json(['error' => 'Access denied'], 403);
         }
         
@@ -94,7 +143,7 @@ class WhatsAppController extends BaseController
                     'text' => $message->message,
                     'type' => $message->nature, // 'sent' or 'received'
                     'message_type' => $message->type ?? 'text',
-                    'time' => $message->time_sent->format('H:i'),
+                    'time' => \Carbon\Carbon::parse($message->time_sent)->format('H:i'),
                     'status' => $message->status ?? 'delivered',
                     'media_url' => $message->url ?? null
                 ];
@@ -103,7 +152,7 @@ class WhatsAppController extends BaseController
         $phoneDisplay = CountryService::formatPhoneForDisplay(
             $conversation->decrypted_phone,
             $conversation->contact_name,
-            $user['permissions']['can_see_phone']
+            ($admin->role === 'super_admin')
         );
         
         return response()->json([
@@ -241,8 +290,12 @@ class WhatsAppController extends BaseController
 
     private function getCurrentUser(): array
     {
-        // This should be replaced with actual authentication logic
         $admin = Auth::guard('whatsapp_admin')->user();
+        
+        \Log::info('WhatsApp Auth Debug:', [
+            'admin' => $admin ? $admin->toArray() : 'null',
+            'guard_check' => Auth::guard('whatsapp_admin')->check()
+        ]);
         
         if ($admin) {
             return [
@@ -260,20 +313,8 @@ class WhatsAppController extends BaseController
             ];
         }
         
-        // Fallback for development/testing
-        return [
-            'id' => 1,
-            'name' => 'Demo User',
-            'email' => 'demo@example.com',
-            'role' => 'agent',
-            'permissions' => [
-                'role_name' => 'Agent',
-                'can_see_all' => false,
-                'can_assign' => false,
-                'can_delete' => false,
-                'can_see_phone' => false
-            ]
-        ];
+        // If no authenticated admin, throw an error - no fallback
+        throw new \Exception('No authenticated admin user found');
     }
 
     private function getRoleName(string $role): string

@@ -67,8 +67,8 @@ Route::get('/auth/check', [AuthController::class, 'check'])
 Route::post('/logout', [AuthController::class, 'logout'])
     ->name('logout');
 
-// WhatsApp dashboard and API routes (for main site integration)
-Route::middleware(['web'])->group(function () {
+// WhatsApp dashboard and API routes (with admin authentication)
+Route::middleware(['web', 'auth:whatsapp_admin'])->group(function () {
     
     // Dashboard
     Route::get('/dashboard', [WhatsAppController::class, 'dashboard'])
@@ -76,9 +76,17 @@ Route::middleware(['web'])->group(function () {
     
     // API routes for WhatsApp functionality
     Route::prefix('api')->group(function () {
+        Route::get('/whatsapp/conversations', [WhatsAppController::class, 'getConversations']);
+        Route::get('/whatsapp/messages/{conversationId}', [WhatsAppController::class, 'getMessages']);
+        Route::post('/whatsapp/send-message', [WhatsAppController::class, 'sendMessage']);
+        Route::post('/whatsapp/upload-media', [WhatsAppController::class, 'uploadMedia']);
         Route::post('/whatsapp/send-text', [WhatsAppController::class, 'sendText']);
         Route::post('/whatsapp/send-media', [WhatsAppController::class, 'sendMedia']);
         Route::get('/whatsapp/messages', [WhatsAppController::class, 'getMessages']);
+        
+        // Legacy compatibility routes
+        Route::get('/whatsapp/interactions', [WhatsAppController::class, 'getConversations']);
+        Route::get('/whatsapp/interactions/{id}/messages', [WhatsAppController::class, 'getMessages']);
     });
 });
 
@@ -88,6 +96,17 @@ Route::middleware(['web'])->group(function () {
 Route::get('/test-webhook', function() {
     return 'Webhook test OK';
 });
+
+// Debug authentication endpoint
+Route::get('/debug-auth', function() {
+    $admin = Auth::guard('whatsapp_admin')->user();
+    return response()->json([
+        'authenticated' => Auth::guard('whatsapp_admin')->check(),
+        'admin' => $admin ? $admin->toArray() : null,
+        'session_data' => session()->all(),
+        'guard_name' => 'whatsapp_admin'
+    ]);
+})->middleware(['web']);
 
 // Test message creation
 Route::get('/test-message', function() {
@@ -275,9 +294,9 @@ Route::prefix('demo')->group(function () {
         ->defaults('role', 'agent');
 });
 
-// Demo API Routes (for testing)
-Route::middleware(['web'])->prefix('api/whatsapp')->group(function () {
-    Route::get('/conversations', [\App\Http\Controllers\DemoController::class, 'getConversations']);
-    Route::get('/messages/{conversationId}', [\App\Http\Controllers\DemoController::class, 'getMessages']);
-    Route::post('/send-message', [\App\Http\Controllers\DemoController::class, 'sendMessage']);
-});
+// Demo API Routes (for testing) - DISABLED to prevent conflicts with authenticated routes
+// Route::middleware(['web'])->prefix('api/whatsapp')->group(function () {
+//     Route::get('/conversations', [\App\Http\Controllers\DemoController::class, 'getConversations']);
+//     Route::get('/messages/{conversationId}', [\App\Http\Controllers\DemoController::class, 'getMessages']);
+//     Route::post('/send-message', [\App\Http\Controllers\DemoController::class, 'sendMessage']);
+// });

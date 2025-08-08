@@ -418,7 +418,7 @@
                                 <div class="conversation-phone">{{ $conversation['contact_phone'] }}</div>
                                 <div class="conversation-message">{{ Str::limit($conversation['last_message'] ?? '', 50) }}</div>
                                 <div class="conversation-time">
-                                    {{ $conversation['last_msg_time'] ? $conversation['last_msg_time']->diffForHumans() : '' }}
+                                    {{ $conversation['last_msg_time'] ? \Carbon\Carbon::parse($conversation['last_msg_time'])->diffForHumans() : '' }}
                                     @if($conversation['unread'] > 0)
                                         <span style="background: #25d366; color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-left: 8px;">{{ $conversation['unread'] }}</span>
                                     @endif
@@ -448,7 +448,7 @@
                                     {{ $message['type'] === 'sent' ? '→ Sent to' : '← Received from' }}: {{ $message['contact_name'] }}
                                 </div>
                                 <div style="color: #333; margin: 3px 0;">{{ Str::limit($message['message'], 60) }}</div>
-                                <div style="color: #999; font-size: 11px;">{{ $message['time_sent']->diffForHumans() }}</div>
+                                <div style="color: #999; font-size: 11px;">{{ \Carbon\Carbon::parse($message['time_sent'])->diffForHumans() }}</div>
                             </div>
                         @endforeach
                     @else

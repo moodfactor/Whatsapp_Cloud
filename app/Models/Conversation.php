@@ -13,13 +13,12 @@ class Conversation extends Model
 
     protected $table = 'whatsapp_interactions';
 
-    protected $fillable = ["name", "wa_no", "wa_no_id", "receiver_id", "last_message", "last_msg_time", "time_sent", "type", "type_id", "unread", "assigned_to", "status"];
+    protected $fillable = ["name", "receiver_id", "last_message", "last_msg_time", "unread", "assigned_to", "status", "metadata"];
 
     protected $appends = ['contact_name', 'contact_phone', 'decrypted_phone'];
     
     protected $casts = [
         'last_msg_time' => 'datetime',
-        'time_sent' => 'datetime',
         'unread' => 'integer'
     ];
 
@@ -35,7 +34,7 @@ class Conversation extends Model
 
     public function assignedTo()
     {
-        return $this->belongsTo(\App\Models\Admin\Admins::class, 'assigned_to');
+        return $this->belongsTo(\App\Models\WhatsappAdmin::class, 'assigned_to');
     }
 
     public function scopeOpen($query)
@@ -52,12 +51,11 @@ class Conversation extends Model
     }
 
     /**
-     * Virtual attribute for contact_phone (maps to wa_no field)
+     * Virtual attribute for contact_phone (maps to receiver_id field)
      */
     public function getContactPhoneAttribute(): string
     {
-        // Try both wa_no and receiver_id fields for compatibility
-        return $this->wa_no ?? $this->receiver_id ?? '';
+        return $this->receiver_id ?? '';
     }
 
     /**
@@ -65,8 +63,7 @@ class Conversation extends Model
      */
     public function getDecryptedPhoneAttribute(): string
     {
-        // Try both wa_no and receiver_id for compatibility
-        $phone = $this->wa_no ?? $this->receiver_id ?? '';
+        $phone = $this->receiver_id ?? '';
         
         if (empty($phone)) {
             return '';
@@ -155,20 +152,16 @@ class Conversation extends Model
         $normalizedPhone = CountryService::normalizePhoneNumber($phone);
         
         // Try to find existing conversation with this phone number
-        // Check both wa_no and receiver_id fields
+        // Only check receiver_id field since wa_no doesn't exist in the database
         $existing = self::where(function($query) use ($normalizedPhone, $phone) {
-            $query->where('wa_no', $normalizedPhone)
-                  ->orWhere('wa_no', $phone)
-                  ->orWhere('receiver_id', $normalizedPhone)
+            $query->where('receiver_id', $normalizedPhone)
                   ->orWhere('receiver_id', $phone);
             
             // Also try encrypted versions
             try {
                 $encryptedNormalized = Crypt::encryptString($normalizedPhone);
                 $encryptedOriginal = Crypt::encryptString($phone);
-                $query->orWhere('wa_no', $encryptedNormalized)
-                      ->orWhere('wa_no', $encryptedOriginal)
-                      ->orWhere('receiver_id', $encryptedNormalized)
+                $query->orWhere('receiver_id', $encryptedNormalized)
                       ->orWhere('receiver_id', $encryptedOriginal);
             } catch (\Exception $e) {
                 // Ignore encryption errors
@@ -181,7 +174,7 @@ class Conversation extends Model
 
         // Create new conversation with normalized phone
         return self::create([
-            'receiver_id' => $normalizedPhone, // Store in receiver_id for consistency
+            'receiver_id' => $normalizedPhone,
             'name' => $contactName,
             'status' => 'new',
             'last_msg_time' => now()

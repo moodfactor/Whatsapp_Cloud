@@ -472,6 +472,10 @@
                 conversations = data.conversations || [];
                 userPermissions = data.user_permissions || {};
                 
+                // Debug: Log received data
+                console.log('Debug - User Permissions:', userPermissions);
+                console.log('Debug - First conversation:', conversations[0]);
+                
                 displayConversations();
             } catch (error) {
                 console.error('Error loading conversations:', error);
@@ -503,13 +507,18 @@
                 const isArabText = conv.is_arab ? 'arab-text' : '';
                 const timeAgo = formatTimeAgo(conv.last_msg_time);
                 
+                // Show full phone if permitted, otherwise show masked phone
+                const displayPhone = userPermissions.can_see_phone && conv.full_phone 
+                    ? conv.full_phone 
+                    : conv.contact_phone;
+                
                 div.innerHTML = `
                     <div class="conversation-header">
                         <div class="contact-info">
                             <span class="country-flag">${conv.country_flag || '🌍'}</span>
                             <div>
                                 <div class="contact-name ${isArabText}">${escapeHtml(conv.contact_name)}</div>
-                                <div class="contact-phone">${escapeHtml(conv.contact_phone)}</div>
+                                <div class="contact-phone">${escapeHtml(displayPhone)}</div>
                             </div>
                         </div>
                         <div style="display: flex; align-items: center; gap: 4px;">
@@ -545,7 +554,7 @@
                 <span class="country-flag" style="font-size: 20px; margin-right: 8px;">${conv.country_flag || '🌍'}</span>
                 <div class="chat-contact-info">
                     <div class="chat-contact-name ${isArabText}">${escapeHtml(conv.contact_name)}</div>
-                    <div class="chat-contact-phone">${escapeHtml(conv.contact_phone)} • ${conv.country_name || 'Unknown'}</div>
+                    <div class="chat-contact-phone">${escapeHtml(userPermissions.can_see_phone && conv.full_phone ? conv.full_phone : conv.contact_phone)} • ${conv.country_name || 'Unknown'}</div>
                 </div>
             `;
             

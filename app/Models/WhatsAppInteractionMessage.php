@@ -20,4 +20,9 @@ class WhatsAppInteractionMessage extends Model
     {
         return $this->belongsTo(Conversation::class, 'interaction_id');
     }
+
+    public function interaction()
+    {
+        return $this->belongsTo(Conversation::class, 'interaction_id');
+    }
 }
