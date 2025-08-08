@@ -570,7 +570,7 @@
             hideSidebar();
         }
 
-        async function loadMessages(conversationId) {
+        async function loadMessages(conversationId, silentRefresh = false) {
             try {
                 const response = await fetch(`/api/whatsapp/messages/${conversationId}`, {
                     method: 'GET',
@@ -588,6 +588,20 @@
                 const messages = data.messages || [];
 
                 const container = document.getElementById('messages');
+                
+                // Remember scroll position for silent refresh
+                const wasAtBottom = silentRefresh ? 
+                    (container.scrollTop + container.clientHeight >= container.scrollHeight - 5) : true;
+                
+                // Only show new message indicator if there are new messages during silent refresh
+                if (silentRefresh) {
+                    const currentMessageCount = container.children.length - (container.querySelector('.empty-state') ? 1 : 0);
+                    if (messages.length > currentMessageCount) {
+                        // Flash a subtle indicator for new messages
+                        showNewMessageIndicator();
+                    }
+                }
+                
                 container.innerHTML = '';
 
                 if (messages.length === 0) {
@@ -634,13 +648,40 @@
                     container.appendChild(div);
                 });
 
-                // Scroll to bottom
-                container.scrollTop = container.scrollHeight;
+                // Only scroll to bottom if user was already at bottom or it's initial load
+                if (wasAtBottom || !silentRefresh) {
+                    container.scrollTop = container.scrollHeight;
+                }
                 
             } catch (error) {
                 console.error('Error loading messages:', error);
                 showError('Failed to load messages.');
             }
+        }
+
+        // Show a subtle indicator when new messages arrive
+        function showNewMessageIndicator() {
+            const indicator = document.createElement('div');
+            indicator.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #25d366;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 20px;
+                font-size: 14px;
+                z-index: 9999;
+                animation: slideIn 0.3s ease;
+            `;
+            indicator.innerHTML = '<i class="fas fa-comment-dots"></i> New message';
+            document.body.appendChild(indicator);
+            
+            setTimeout(() => {
+                if (indicator.parentNode) {
+                    document.body.removeChild(indicator);
+                }
+            }, 3000);
         }
 
         async function sendMessage() {
@@ -872,12 +913,19 @@
             }
         }
 
-        // Auto-refresh conversations every 30 seconds
+        // Auto-refresh conversations every 5 seconds for real-time updates
         setInterval(() => {
             if (!document.hidden) {
                 loadConversations();
             }
-        }, 30000);
+        }, 5000);
+
+        // Auto-refresh messages in current conversation every 3 seconds
+        setInterval(() => {
+            if (!document.hidden && currentConversation) {
+                loadMessages(currentConversation, true); // true = silent refresh
+            }
+        }, 3000);
 
         // Enter key to send message
         document.addEventListener('DOMContentLoaded', function() {
