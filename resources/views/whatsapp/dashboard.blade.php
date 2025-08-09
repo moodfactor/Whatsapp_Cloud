@@ -7,6 +7,17 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script>
+    document.addEventListener('alpine:init', () => {
+        console.log('Alpine.js initialized');
+    });
+    document.addEventListener('alpine:initialized', () => {
+        console.log('Alpine.js fully loaded and initialized');
+        // Test if we can find the media modal
+        const modal = document.querySelector('[x-data="mediaUploadModal()"]');
+        console.log('Media modal found after Alpine init:', !!modal);
+    });
+    </script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -663,6 +674,19 @@
 
     <!-- Media Upload Modal (Simple Alpine.js) -->
     @include('components.media-upload-modal')
+    
+    <!-- Debug: Check if modal is included -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const modal = document.querySelector('[x-data="mediaUploadModal()"]');
+        console.log('Media modal element found:', !!modal);
+        if (modal) {
+            console.log('Modal element:', modal);
+        } else {
+            console.error('Media upload modal not found in DOM');
+        }
+    });
+    </script>
 
     <!-- Image Modal -->
     <div class="image-modal" id="imageModal" onclick="closeImageModal()">
@@ -849,6 +873,17 @@
                     div.className = `message ${msg.type}`;
                     
                     let messageContent = '';
+                    
+                    // Debug logging
+                    if (msg.debug_type && msg.debug_type !== 'text') {
+                        console.log('Media message debug:', {
+                            message_type: msg.message_type,
+                            debug_type: msg.debug_type,
+                            has_url: msg.debug_has_url,
+                            media_url: msg.media_url,
+                            text: msg.text
+                        });
+                    }
                     
                     // Handle different media types
                     if (msg.message_type === 'image' && msg.media_url) {
@@ -1130,15 +1165,36 @@
 
         // Media dialog functions
         function openMediaDialog() {
+            console.log('openMediaDialog called', { currentConversation });
+            
             if (!currentConversation) {
                 showError('Please select a conversation first');
                 return;
             }
             
+            // Check if Alpine.js is loaded
+            if (typeof Alpine === 'undefined') {
+                console.warn('Alpine.js not loaded, falling back to direct modal opening');
+            }
+            
+            console.log('Dispatching media dialog event');
+            
             // Use Alpine.js event system (simple and reliable)
-            window.dispatchEvent(new CustomEvent('open-simple-media-dialog', {
+            const event = new CustomEvent('open-simple-media-dialog', {
                 detail: { conversationId: currentConversation }
-            }));
+            });
+            
+            console.log('Event created:', event);
+            window.dispatchEvent(event);
+            
+            // Add a fallback - try to open the modal directly after a delay
+            setTimeout(() => {
+                const modalElement = document.querySelector('[x-data="mediaUploadModal()"]');
+                if (modalElement && modalElement._x_dataStack) {
+                    console.log('Found modal element, trying to open directly');
+                    modalElement._x_dataStack[0].openDialog(currentConversation);
+                }
+            }, 100);
         }
 
         // Image modal functions

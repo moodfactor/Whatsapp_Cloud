@@ -48,10 +48,12 @@
         </div>
 
         <!-- Include the media upload modal -->
-        <div x-data="{ 
-                isOpen: false, 
-                selectedFile: null, 
-                caption: '', 
+        <script>
+        function testMediaModal() {
+            return {
+                isOpen: false,
+                selectedFile: null,
+                caption: '',
                 conversationId: null,
                 previewData: null,
                 isUploading: false,

@@ -1,8 +1,10 @@
 <!-- Simple Media Upload Modal (Pure Alpine.js fallback) -->
-<div x-data="{ 
-        isOpen: false, 
-        selectedFile: null, 
-        caption: '', 
+<script>
+function mediaUploadModal() {
+    return {
+        isOpen: false,
+        selectedFile: null,
+        caption: '',
         conversationId: null,
         previewData: null,
         isUploading: false,
@@ -103,7 +105,7 @@
                 const response = await fetch('/api/whatsapp/upload-media', {
                     method: 'POST',
                     headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name=\"csrf-token\"]').getAttribute('content'),
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                     },
                     body: formData
                 });
@@ -126,7 +128,11 @@
                 this.isUploading = false;
             }
         }
-     }"
+    }
+}
+</script>
+
+<div x-data="mediaUploadModal()" 
      x-cloak
      @open-simple-media-dialog.window="openDialog($event.detail.conversationId)">
 

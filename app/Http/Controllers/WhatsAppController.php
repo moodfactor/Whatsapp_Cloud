@@ -149,7 +149,10 @@ class WhatsAppController extends BaseController
                     'media_url' => $message->url ?? null,
                     'filename' => $message->filename ?? null,
                     'mime_type' => $message->mime_type ?? null,
-                    'file_size' => $message->file_size ?? null
+                    'file_size' => $message->file_size ?? null,
+                    // Debug info to help troubleshoot
+                    'debug_type' => $message->type,
+                    'debug_has_url' => !empty($message->url)
                 ];
             });
         
