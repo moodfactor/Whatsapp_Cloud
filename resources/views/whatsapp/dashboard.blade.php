@@ -900,24 +900,12 @@
                     
                     let messageContent = '';
                     
-                    // Debug logging
-                    if (msg.debug_type && msg.debug_type !== 'text') {
-                        console.log('Media message debug:', {
-                            message_type: msg.message_type,
-                            debug_type: msg.debug_type,
-                            has_url: msg.debug_has_url,
-                            media_url: msg.media_url,
-                            text: msg.text
-                        });
-                    }
-                    
                     // Handle different media types
                     if (msg.message_type === 'image' && msg.media_url) {
                         messageContent = `
                             <div class="media-message">
                                 <img src="${msg.media_url}" alt="Image" onclick="openImageModal('${msg.media_url}')">
                                 ${msg.text && msg.text !== '[Image]' ? `<div class="media-caption">${escapeHtml(msg.text)}</div>` : ''}
-                                <div class="message-time">${msg.time} ${getStatusIcon(msg.status)}</div>
                             </div>
                         `;
                     } else if (msg.message_type === 'video' && msg.media_url) {
@@ -928,23 +916,15 @@
                                     Your browser does not support the video tag.
                                 </video>
                                 ${msg.text && msg.text !== '[Video]' ? `<div class="media-caption">${escapeHtml(msg.text)}</div>` : ''}
-                                <div class="message-time">${msg.time} ${getStatusIcon(msg.status)}</div>
                             </div>
                         `;
                     } else if (msg.message_type === 'audio' && msg.media_url) {
                         messageContent = `
                             <div class="audio-message">
-                                <div class="audio-icon">
-                                    <i class="fas fa-music"></i>
-                                </div>
-                                <div class="audio-info">
-                                    <div class="audio-name">${msg.filename || 'Audio'}</div>
-                                    <audio controls>
-                                        <source src="${msg.media_url}" type="audio/mpeg">
-                                        Your browser does not support the audio tag.
-                                    </audio>
-                                </div>
-                                <div class="message-time">${msg.time} ${getStatusIcon(msg.status)}</div>
+                                <audio controls>
+                                    <source src="${msg.media_url}" type="audio/mpeg">
+                                    Your browser does not support the audio element.
+                                </audio>
                             </div>
                         `;
                     } else if (msg.message_type === 'document' && msg.media_url) {
@@ -956,9 +936,7 @@
                                 </div>
                                 <div class="document-info">
                                     <div class="document-name">${msg.filename || msg.text || 'Document'}</div>
-                                    <div class="document-size">Document</div>
                                 </div>
-                                <div class="message-time">${msg.time} ${getStatusIcon(msg.status)}</div>
                             </div>
                         `;
                     } else {
@@ -966,12 +944,16 @@
                         messageContent = `
                             <div class="message-bubble">
                                 ${escapeHtml(msg.text).replace(/\n/g, '<br>')}
-                                <div class="message-time">${msg.time} ${getStatusIcon(msg.status)}</div>
                             </div>
                         `;
                     }
-                    
-                    div.innerHTML = messageContent;
+
+                    div.innerHTML = `
+                        <div class="message-bubble">
+                            ${messageContent}
+                            <div class="message-time">${msg.time} ${getStatusIcon(msg.status)}</div>
+                        </div>
+                    `;
                     container.appendChild(div);
                 });
 
@@ -1198,27 +1180,28 @@
                 return;
             }
             
-            // Check if Alpine.js is loaded
-            if (typeof Alpine === 'undefined') {
-                console.warn('Alpine.js not loaded, falling back to direct modal opening');
-            }
-            
             console.log('Dispatching media dialog event');
             
-            // Use Alpine.js event system (simple and reliable)
-            const event = new CustomEvent('open-simple-media-dialog', {
+            // Use Alpine.js event system
+            const event = new CustomEvent('open-media-dialog', {
                 detail: { conversationId: currentConversation }
             });
             
             console.log('Event created:', event);
             window.dispatchEvent(event);
             
-            // Add a fallback - try to open the modal directly after a delay
+            // Fallback - try to open the modal directly
             setTimeout(() => {
-                const modalElement = document.querySelector('[x-data="mediaUploadModal()"]');
-                if (modalElement && modalElement._x_dataStack) {
-                    console.log('Found modal element, trying to open directly');
+                const modalElement = document.querySelector('[x-data*="mediaUploadModal"]');
+                console.log('Found modal element, trying to open directly');
+                if (modalElement && modalElement._x_dataStack && modalElement._x_dataStack[0]) {
                     modalElement._x_dataStack[0].openDialog(currentConversation);
+                } else if (modalElement && window.Alpine) {
+                    // Try Alpine's $data approach
+                    const alpineData = window.Alpine.$data(modalElement);
+                    if (alpineData && alpineData.openDialog) {
+                        alpineData.openDialog(currentConversation);
+                    }
                 }
             }, 100);
         }

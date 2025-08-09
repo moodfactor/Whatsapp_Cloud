@@ -166,8 +166,10 @@ Route::get('/whatsapp/webhook', function(Request $request) {
     return response('Forbidden', 403);
 });
 
+use App\Services\MetaWhatsappService;
+
 // WhatsApp webhook messages (POST)
-Route::post('/whatsapp/webhook', function(Request $request) {
+Route::post('/whatsapp/webhook', function(Request $request, MetaWhatsappService $metaWhatsappService) {
     $payload = $request->all();
     Log::info('WhatsApp webhook received:', $payload);
     
@@ -193,23 +195,46 @@ Route::post('/whatsapp/webhook', function(Request $request) {
 
                                     Log::info("Found/created conversation ID: {$conversation->id}");
 
-                                    // Create message record
-                                    $messageRecord = \App\Models\WhatsAppInteractionMessage::create([
+                                    $messageData = [
                                         'interaction_id' => $conversation->id,
-                                        'message' => $messageText ?: '[' . ucfirst($messageType) . ']',
                                         'type' => $messageType,
                                         'nature' => 'received',
                                         'status' => 'delivered',
                                         'time_sent' => $timestamp,
                                         'whatsapp_message_id' => $messageId,
                                         'metadata' => json_encode($message)
-                                    ]);
+                                    ];
 
+                                    $lastMessageContent = '[' . ucfirst($messageType) . ']';
+
+                                    if ($messageType === 'text') {
+                                        $messageData['message'] = $message['text']['body'] ?? '';
+                                        $lastMessageContent = $messageData['message'];
+                                    } elseif (in_array($messageType, ['image', 'video', 'audio', 'document'])) {
+                                        $mediaId = $message[$messageType]['id'] ?? null;
+                                        if ($mediaId) {
+                                            $mediaResult = $metaWhatsappService->downloadMedia($mediaId);
+                                            if ($mediaResult['success']) {
+                                                $messageData['url'] = $mediaResult['full_url'];
+                                                $messageData['filename'] = $mediaResult['filename'];
+                                                $messageData['mime_type'] = $mediaResult['mime_type'];
+                                                $messageData['file_size'] = $mediaResult['file_size'];
+                                                $messageData['message'] = $message[$messageType]['caption'] ?? $mediaResult['filename'];
+                                                $lastMessageContent = $messageData['message'];
+                                            } else {
+                                                Log::error('Failed to download media', ['media_id' => $mediaId, 'error' => $mediaResult['error']]);
+                                                $messageData['message'] = '[Failed to download media]';
+                                            }
+                                        }
+                                    } else {
+                                        $messageData['message'] = '[' . ucfirst($messageType) . ']';
+                                    }
+
+                                    $messageRecord = \App\Models\WhatsAppInteractionMessage::create($messageData);
                                     Log::info("Created message record ID: {$messageRecord->id}");
 
-                                    // Update conversation with latest message
                                     $conversation->update([
-                                        'last_message' => $messageText ?: '[' . ucfirst($messageType) . ']',
+                                        'last_message' => $lastMessageContent,
                                         'last_msg_time' => $timestamp,
                                         'status' => 'new',
                                         'unread' => $conversation->unread + 1

@@ -6,7 +6,13 @@ function mediaUploadModal() {
         selectedFile: null,
         caption: '',
         conversationId: null,
-        previewData: null,
+        previewData: {
+            type: null,
+            url: null,
+            filename: null,
+            size: null,
+            icon: null
+        },
         isUploading: false,
         
         openDialog(convId) {
@@ -15,25 +21,6 @@ function mediaUploadModal() {
             this.isOpen = true;
             this.resetForm();
             console.log('Modal state set to open:', this.isOpen);
-            
-            // Test alert to confirm JavaScript is working
-            alert('Modal should be opening now! Check if you can see it.');
-            
-            // Force show modal after a short delay
-            setTimeout(() => {
-                const modalElement = document.querySelector('[x-show="isOpen"]');
-                console.log('Modal element found:', modalElement);
-                if (modalElement) {
-                    modalElement.style.display = 'flex !important';
-                    modalElement.style.visibility = 'visible !important';
-                    modalElement.style.position = 'fixed !important';
-                    modalElement.style.top = '0 !important';
-                    modalElement.style.left = '0 !important';
-                    modalElement.style.width = '100vw !important';
-                    modalElement.style.height = '100vh !important';
-                    console.log('Modal forced visible with explicit styles');
-                }
-            }, 100);
         },
         
         closeDialog() {
@@ -44,7 +31,13 @@ function mediaUploadModal() {
         resetForm() {
             this.selectedFile = null;
             this.caption = '';
-            this.previewData = null;
+            this.previewData = {
+                type: null,
+                url: null,
+                filename: null,
+                size: null,
+                icon: null
+            };
             this.isUploading = false;
         },
         
@@ -155,7 +148,8 @@ function mediaUploadModal() {
 
 <div x-data="mediaUploadModal()" 
      x-cloak
-     @open-simple-media-dialog.window="openDialog($event.detail.conversationId)">
+     x-init="console.log('Media modal initialized');"
+     @open-media-dialog.window="openDialog($event.detail.conversationId)">
 
     <!-- File Input (Hidden) -->
     <input type="file" 
@@ -166,8 +160,8 @@ function mediaUploadModal() {
 
     <!-- Media Preview Dialog -->
     <div x-show="isOpen" 
-         class="fixed inset-0 overflow-y-auto"
-         style="z-index: 9999 !important; background: rgba(255,0,0,0.8) !important; display: flex !important; align-items: center !important; justify-content: center !important; position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;"
+         class="fixed inset-0 flex items-center justify-center overflow-y-auto"
+         style="z-index: 9999; background: rgba(0,0,0,0.5);"
          x-transition:enter="ease-out duration-300"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -175,104 +169,58 @@ function mediaUploadModal() {
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0">
         
-        <!-- Background overlay -->
-        <div class="fixed inset-0 bg-black bg-opacity-75 transition-opacity"></div>
-        
         <!-- Dialog container -->
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="relative bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden"
-                 x-transition:enter="ease-out duration-300"
-                 x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                 x-transition:leave="ease-in duration-200"
-                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                 x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95">
-                
-                <!-- Dialog Header -->
-                <div class="flex items-center justify-between p-4 border-b border-gray-200">
-                    <h3 class="text-lg font-semibold text-gray-900">Send Media</h3>
-                    <button @click="closeDialog()" 
-                            class="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
+        <div class="relative bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[80vh] overflow-hidden m-4"
+             @click.away="closeDialog()">
+            
+            <!-- Dialog Header -->
+            <div class="flex items-center justify-between p-4 border-b">
+                <h3 class="text-lg font-semibold">Send Media</h3>
+                <button @click="closeDialog()" class="p-2 hover:bg-gray-100 rounded-full">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Dialog Body -->
+            <div class="p-6 overflow-y-auto">
+                <div x-show="!selectedFile" class="text-center py-10">
+                    <button @click="$refs.fileInput.click()" class="bg-green-500 text-white px-6 py-3 rounded-lg font-semibold text-lg">
+                        <i class="fas fa-upload mr-2"></i> Choose File
                     </button>
                 </div>
 
-                <!-- Dialog Body -->
-                <div class="p-6 max-h-[60vh] overflow-y-auto">
-                    <div x-show="!selectedFile" class="text-center py-12">
-                        <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
-                            </svg>
+                <div x-show="selectedFile" class="space-y-4">
+                    <!-- Preview Area -->
+                    <div class="bg-gray-100 rounded-lg p-4 text-center">
+                        <div x-show="previewData && previewData.type === 'image'">
+                            <img :src="previewData.url" alt="Preview" class="max-h-60 mx-auto rounded-md">
                         </div>
-                        <p class="text-gray-600 mb-4">Select a file to send</p>
-                        <button @click="$refs.fileInput.click()" 
-                                class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-medium transition-colors">
-                            Choose File
-                        </button>
+                        <div x-show="previewData && previewData.type === 'document'" class="flex flex-col items-center space-y-3 py-4">
+                            <i :class="`fas ${previewData.icon || 'fa-file'} text-5xl text-gray-500`"></i>
+                            <p class="font-medium" x-text="previewData.filename || 'Document'"></p>
+                            <p class="text-sm text-gray-500" x-text="previewData.size || ''"></p>
+                        </div>
                     </div>
 
-                    <div x-show="selectedFile" class="space-y-6">
-                        <!-- Preview Area -->
-                        <div class="bg-gray-50 rounded-lg p-6 text-center">
-                            <div x-show="previewData && previewData.type === 'image'">
-                                <img :src="previewData ? previewData.url : ''" 
-                                     alt="Preview" 
-                                     class="max-w-full max-h-80 mx-auto rounded-lg shadow-md object-contain">
-                            </div>
-                            <div x-show="previewData && previewData.type !== 'image'" class="flex flex-col items-center space-y-4">
-                                <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center">
-                                    <i :class="previewData ? 'fas ' + previewData.icon + ' text-blue-600 text-2xl' : ''"></i>
-                                </div>
-                                <div class="text-center">
-                                    <p class="font-medium text-gray-900" x-text="previewData ? previewData.filename : ''"></p>
-                                    <p class="text-sm text-gray-500 mt-1" x-text="previewData ? previewData.size : ''"></p>
-                                </div>
-                            </div>
-                        </div>
+                    <!-- Change File Button -->
+                    <div class="text-center">
+                        <button @click="$refs.fileInput.click()" class="text-sm text-blue-600 hover:underline">Change file</button>
+                    </div>
 
-                        <!-- File Info & Change Button -->
-                        <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4">
-                            <div class="flex-1">
-                                <p class="font-medium text-gray-900" x-text="previewData ? previewData.filename : ''"></p>
-                                <p class="text-sm text-gray-500" x-text="previewData ? previewData.size : ''"></p>
-                            </div>
-                            <button @click="$refs.fileInput.click()" 
-                                    class="text-blue-600 hover:text-blue-700 font-medium text-sm">
-                                Change File
-                            </button>
-                        </div>
-
-                        <!-- Caption Input -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Caption (optional)
-                            </label>
-                            <textarea x-model="caption"
-                                      rows="3"
-                                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none"
-                                      placeholder="Add a caption to your media..."></textarea>
-                        </div>
+                    <!-- Caption Input -->
+                    <div>
+                        <textarea x-model="caption" rows="3" class="w-full p-2 border rounded-md" placeholder="Add a caption..."></textarea>
                     </div>
                 </div>
+            </div>
 
-                <!-- Dialog Footer -->
-                <div x-show="selectedFile" class="flex items-center justify-end space-x-3 p-4 border-t border-gray-200 bg-gray-50">
-                    <button @click="closeDialog()" 
-                            class="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors"
-                            :disabled="isUploading">
-                        Cancel
-                    </button>
-                    <button @click="uploadMedia()" 
-                            :disabled="isUploading"
-                            class="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2">
-                        <span x-show="!isUploading">Send</span>
-                        <span x-show="isUploading">Sending...</span>
-                        <div x-show="isUploading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    </button>
-                </div>
+            <!-- Dialog Footer -->
+            <div x-show="selectedFile" class="flex justify-end p-4 border-t bg-gray-50">
+                <button @click="closeDialog()" class="px-4 py-2 mr-2 bg-gray-200 rounded-lg" :disabled="isUploading">Cancel</button>
+                <button @click="uploadMedia()" class="px-6 py-2 bg-green-500 text-white rounded-lg" :disabled="isUploading">
+                    <span x-show="!isUploading">Send</span>
+                    <span x-show="isUploading">Sending... <i class="fas fa-spinner fa-spin"></i></span>
+                </button>
             </div>
         </div>
     </div>

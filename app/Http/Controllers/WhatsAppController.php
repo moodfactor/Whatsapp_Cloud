@@ -9,6 +9,7 @@ use App\Models\Conversation;
 use App\Models\WhatsAppInteractionMessage;
 use App\Services\CountryService;
 use App\Services\MetaWhatsappService;
+use App\Rules\WhatsAppMediaFile;
 use Illuminate\Support\Facades\Storage;
 
 class WhatsAppController extends BaseController
@@ -275,7 +276,7 @@ class WhatsAppController extends BaseController
         
         $request->validate([
             'conversation_id' => 'required|exists:whatsapp_interactions,id',
-            'media' => 'required|file|mimes:jpg,jpeg,png,gif,webp,pdf,doc,docx,mp3,mp4,wav,ogg,m4a,3gp|max:16384', // 16MB max
+            'media' => ['required', 'file', new WhatsAppMediaFile],
             'caption' => 'nullable|string|max:1000'
         ]);
         
@@ -303,10 +304,15 @@ class WhatsAppController extends BaseController
                 ], 500);
             }
             
+            $mediaId = data_get($uploadResult, 'media_id');
+            if (!$mediaId) {
+                throw new \Exception('Media ID not found in WhatsApp API response.');
+            }
+
             // Send media message via WhatsApp API
             $sendResult = $this->whatsappService->sendMediaMessageWithId(
                 $conversation->decrypted_phone,
-                $uploadResult['media_id'],
+                $mediaId,
                 $mediaType,
                 $caption,
                 $file->getClientOriginalName()
