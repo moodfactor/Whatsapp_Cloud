@@ -37,6 +37,7 @@ cp .env.production .env
 # Edit database credentials
 nano .env
 ```
+  
 
 ### 3. Install Dependencies (Without WhatsApp Package)
 
