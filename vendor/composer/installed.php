@@ -3,7 +3,7 @@
         'name' => 'mejsp/whatsapp-microservice',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '466353f7112df6ed87f2d5f6491d9c7d31f1f9da',
+        'reference' => 'daa4c62306a7b072bf2b76eebb124abeccc85c8c',
         'type' => 'project',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -403,7 +403,7 @@
         'mejsp/whatsapp-microservice' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '466353f7112df6ed87f2d5f6491d9c7d31f1f9da',
+            'reference' => 'daa4c62306a7b072bf2b76eebb124abeccc85c8c',
             'type' => 'project',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
