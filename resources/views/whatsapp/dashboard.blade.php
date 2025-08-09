@@ -623,27 +623,234 @@
             text-align: right;
         }
         
+        /* Mobile Header */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: linear-gradient(135deg, #128C7E, #075E54);
+            color: white;
+            align-items: center;
+            padding: 0 20px;
+            z-index: 1001;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .mobile-menu-toggle {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            margin-right: 15px;
+        }
+        
+        .mobile-app-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
         /* Responsive */
         @media (max-width: 768px) {
-            .sidebar {
-                width: 100%;
-                position: absolute;
-                z-index: 1000;
+            .container {
+                flex-direction: column;
                 height: 100vh;
             }
+            
+            .mobile-header {
+                display: flex;
+            }
+            
+            .sidebar {
+                position: fixed;
+                top: 60px;
+                left: 0;
+                width: 100%;
+                height: calc(100vh - 60px);
+                z-index: 1000;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            
+            .sidebar.show {
+                transform: translateX(0);
+            }
+            
+            .sidebar.hidden {
+                transform: translateX(-100%);
+            }
+            
             .chat-area {
                 display: none;
+                margin-top: 60px;
+                height: calc(100vh - 60px);
             }
-            .sidebar.hidden {
-                display: none;
-            }
+            
             .chat-area.mobile-visible {
                 display: flex;
+            }
+            
+            .header {
+                padding: 15px;
+            }
+            
+            .user-info {
+                gap: 8px;
+            }
+            
+            .user-avatar {
+                width: 35px;
+                height: 35px;
+                font-size: 16px;
+            }
+            
+            .permissions {
+                padding: 8px;
+                margin: 8px 0;
+                font-size: 11px;
+            }
+            
+            .conversation {
+                padding: 12px 15px;
+            }
+            
+            .contact-name {
+                font-size: 15px;
+            }
+            
+            .contact-phone {
+                font-size: 12px;
+            }
+            
+            .last-message {
+                font-size: 13px;
+            }
+            
+            .conversation-time {
+                font-size: 11px;
+            }
+            
+            .chat-header {
+                padding: 12px 16px;
+            }
+            
+            .chat-contact-name {
+                font-size: 15px;
+            }
+            
+            .chat-contact-phone {
+                font-size: 12px;
+            }
+            
+            .messages {
+                padding: 15px;
+            }
+            
+            .message-bubble {
+                max-width: 85%;
+                padding: 6px 10px;
+            }
+            
+            .message-input-container {
+                padding: 12px 16px;
+            }
+            
+            .message-input input {
+                padding: 10px 14px;
+                font-size: 16px;
+            }
+            
+            .action-btn {
+                width: 40px;
+                height: 40px;
+            }
+            
+            .media-message {
+                max-width: 240px;
+            }
+            
+            .document-message {
+                max-width: 260px;
+                padding: 10px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .mobile-header {
+                padding: 0 15px;
+            }
+            
+            .mobile-app-title {
+                font-size: 16px;
+            }
+            
+            .header {
+                padding: 12px;
+            }
+            
+            .header h3 {
+                font-size: 16px;
+            }
+            
+            .role-badge {
+                padding: 2px 6px;
+                font-size: 10px;
+            }
+            
+            .permissions {
+                padding: 6px;
+                font-size: 10px;
+            }
+            
+            .conversation {
+                padding: 10px 12px;
+            }
+            
+            .contact-name {
+                font-size: 14px;
+            }
+            
+            .contact-phone {
+                font-size: 11px;
+            }
+            
+            .last-message {
+                font-size: 12px;
+            }
+            
+            .message-bubble {
+                max-width: 90%;
+                padding: 6px 8px;
+                font-size: 14px;
+            }
+            
+            .media-message {
+                max-width: 200px;
+            }
+            
+            .document-message {
+                max-width: 220px;
+                padding: 8px;
+            }
+            
+            .message-time {
+                font-size: 10px;
             }
         }
     </style>
 </head>
 <body>
+    <!-- Mobile Header -->
+    <div class="mobile-header">
+        <button class="mobile-menu-toggle" onclick="toggleMobileSidebar()">
+            <i class="fas fa-bars"></i>
+        </button>
+        <div class="mobile-app-title">💬 WhatsApp Chat</div>
+    </div>
+    
     <div class="container">
         <!-- Sidebar -->
         <div class="sidebar" id="sidebar">
@@ -1472,17 +1679,34 @@
         }
 
         // Mobile responsiveness
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('show');
+        }
+        
         function showSidebar() {
-            document.getElementById('sidebar').classList.remove('hidden');
-            document.getElementById('chatArea').classList.remove('mobile-visible');
-            document.getElementById('backBtn').style.display = 'none';
+            const sidebar = document.getElementById('sidebar');
+            const chatArea = document.getElementById('chatArea');
+            const backBtn = document.getElementById('backBtn');
+            
+            if (window.innerWidth <= 768) {
+                sidebar.classList.remove('hidden');
+                sidebar.classList.add('show');
+                chatArea.classList.remove('mobile-visible');
+                if (backBtn) backBtn.style.display = 'none';
+            }
         }
 
         function hideSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const chatArea = document.getElementById('chatArea');
+            const backBtn = document.getElementById('backBtn');
+            
             if (window.innerWidth <= 768) {
-                document.getElementById('sidebar').classList.add('hidden');
-                document.getElementById('chatArea').classList.add('mobile-visible');
-                document.getElementById('backBtn').style.display = 'block';
+                sidebar.classList.add('hidden');
+                sidebar.classList.remove('show');
+                chatArea.classList.add('mobile-visible');
+                if (backBtn) backBtn.style.display = 'block';
             }
         }
 

@@ -24,9 +24,10 @@
             background: white;
             border-radius: 10px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            padding: 40px;
+            padding: 30px;
             width: 400px;
-            max-width: 90%;
+            max-width: 95%;
+            margin: 20px;
         }
         
         .logo {
@@ -141,6 +142,44 @@
             margin-top: 30px;
             color: #666;
             font-size: 12px;
+        }
+        
+        /* Mobile Styles */
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+            
+            .login-container {
+                padding: 25px 20px;
+                margin: 10px;
+                max-width: 100%;
+            }
+            
+            .logo h1 {
+                font-size: 24px;
+            }
+            
+            input[type="email"],
+            input[type="password"] {
+                font-size: 16px;
+                padding: 14px;
+            }
+            
+            .login-btn {
+                padding: 14px;
+                font-size: 16px;
+            }
+            
+            .demo-credentials {
+                padding: 12px;
+            }
+            
+            .demo-credentials .credential {
+                font-size: 11px;
+                padding: 6px;
+                margin-bottom: 6px;
+            }
         }
     </style>
 </head>
