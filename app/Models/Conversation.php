@@ -169,6 +169,15 @@ class Conversation extends Model
         })->first();
 
         if ($existing) {
+            // Update the contact name if we got a better name (not a phone number)
+            if ($contactName !== 'Unknown' && $contactName !== $phone && $contactName !== $normalizedPhone) {
+                // Only update if current name looks like a phone number or is generic
+                $currentName = $existing->name;
+                if (self::looksLikePhoneNumber($currentName) || in_array($currentName, ['Unknown', 'unknown', ''])) {
+                    $existing->update(['name' => $contactName]);
+                    \Log::info("Updated conversation {$existing->id} name from '{$currentName}' to '{$contactName}'");
+                }
+            }
             return $existing;
         }
 
@@ -179,5 +188,26 @@ class Conversation extends Model
             'status' => 'new',
             'last_msg_time' => now()
         ]);
+    }
+
+    /**
+     * Check if a string looks like a phone number
+     */
+    private static function looksLikePhoneNumber(string $text): bool
+    {
+        if (empty($text)) return false;
+        
+        // Remove all non-digit characters except +
+        $cleaned = preg_replace('/[^+\d]/', '', $text);
+        
+        // Check if it looks like a phone number:
+        // - Starts with + and has at least 10 digits
+        // - Or starts with 0 and has at least 10 digits 
+        // - Or has at least 10 digits total
+        return (
+            (str_starts_with($cleaned, '+') && strlen($cleaned) >= 11) ||
+            (str_starts_with($cleaned, '0') && strlen($cleaned) >= 10) ||
+            (strlen($cleaned) >= 10 && ctype_digit($cleaned))
+        );
     }
 }

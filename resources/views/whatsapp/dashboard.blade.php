@@ -666,8 +666,8 @@
                                     <span>Can assign conversations to supervisors/agents</span>
                                 </div>
                                 <div class="permission-item">
-                                    <i class="fas fa-eye permission-icon"></i>
-                                    <span>Can see actual phone numbers</span>
+                                <i class="fas fa-eye permission-icon"></i>
+                                <span>Can see unmasked phone numbers</span>
                                 </div>
                             @elseif ($user['permissions']['role_name'] === 'Supervisor')
                                 <div class="permission-item">
@@ -727,6 +727,7 @@
                     @else
                         <p>Select a conversation assigned to you to start messaging</p>
                     @endif
+                    <small style="color: #8696a0; margin-top: 8px; display: block;">Note: Contact names shown as country names for privacy when phone numbers are used as names</small>
                 </div>
             </div>
             <div class="message-input-container">
@@ -841,9 +842,12 @@
                 const timeAgo = formatTimeAgo(conv.last_msg_time);
                 
                 // Show full phone if permitted, otherwise show masked phone
-                const displayPhone = userPermissions.can_see_phone && conv.full_phone 
-                    ? conv.full_phone 
-                    : conv.contact_phone;
+                const displayPhone = userPermissions.can_see_phone ? conv.contact_phone : maskPhoneNumber(conv.contact_phone);
+                
+                // If contact name looks like a phone number and user can't see phones, use country name
+                const displayName = (!userPermissions.can_see_phone && isPhoneNumber(conv.contact_name)) 
+                    ? (conv.country_name || 'Contact')
+                    : conv.contact_name;
                 
                 // Create status badge
                 let statusBadge = '';
@@ -862,7 +866,7 @@
                         <div class="contact-info">
                             <span class="country-flag">${conv.country_flag || '🌍'}</span>
                             <div>
-                                <div class="contact-name ${isArabText}">${escapeHtml(conv.contact_name)}</div>
+                                <div class="contact-name ${isArabText}">${escapeHtml(displayName)}</div>
                                 <div class="contact-phone">${escapeHtml(displayPhone)}</div>
                             </div>
                         </div>
@@ -949,8 +953,8 @@
                 </button>
                 <span class="country-flag" style="font-size: 20px; margin-right: 8px;">${conv.country_flag || '🌍'}</span>
                 <div class="chat-contact-info">
-                    <div class="chat-contact-name ${isArabText}">${escapeHtml(conv.contact_name)}</div>
-                    <div class="chat-contact-phone">${escapeHtml(userPermissions.can_see_phone && conv.full_phone ? conv.full_phone : conv.contact_phone)} • ${conv.country_name || 'Unknown'}`;
+                    <div class="chat-contact-name ${isArabText}">${escapeHtml((!userPermissions.can_see_phone && isPhoneNumber(conv.contact_name)) ? (conv.country_name || 'Contact') : conv.contact_name)}</div>
+                    <div class="chat-contact-phone">${escapeHtml(userPermissions.can_see_phone ? conv.contact_phone : maskPhoneNumber(conv.contact_phone))} • ${conv.country_name || 'Unknown'}`;
             
             // Add assignment info for super admin
             if (userPermissions.role_name === 'Super Admin') {
@@ -1391,6 +1395,54 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function maskPhoneNumber(phone) {
+            if (!phone) return '';
+            
+            // Keep country code and first 2 digits, mask middle digits, show last 2 digits
+            // Example: +201234567890 becomes +20**••••**90
+            const cleaned = phone.replace(/[^+\d]/g, '');
+            
+            if (cleaned.length < 6) {
+                return cleaned; // Too short to mask meaningfully
+            }
+            
+            if (cleaned.startsWith('+')) {
+                // International format: +201234567890 -> +20**••••**90
+                const countryCode = cleaned.substring(0, 3); // +20
+                const firstTwo = cleaned.substring(3, 5); // 12
+                const lastTwo = cleaned.substring(cleaned.length - 2); // 90
+                const middleLength = cleaned.length - 7;
+                const maskedMiddle = '•'.repeat(Math.max(0, middleLength));
+                
+                return `${countryCode}${firstTwo}**${maskedMiddle}**${lastTwo}`;
+            } else {
+                // Local format: 01234567890 -> 01**••••**90
+                const firstTwo = cleaned.substring(0, 2);
+                const lastTwo = cleaned.substring(cleaned.length - 2);
+                const middleLength = cleaned.length - 4;
+                const maskedMiddle = '•'.repeat(Math.max(0, middleLength));
+                
+                return `${firstTwo}**${maskedMiddle}**${lastTwo}`;
+            }
+        }
+        
+        function isPhoneNumber(text) {
+            if (!text) return false;
+            
+            // Remove all non-digit characters except +
+            const cleaned = text.replace(/[^+\d]/g, '');
+            
+            // Check if it looks like a phone number:
+            // - Starts with + and has at least 10 digits
+            // - Or starts with 0 and has at least 10 digits 
+            // - Or has at least 10 digits total
+            return (
+                (cleaned.startsWith('+') && cleaned.length >= 11) ||
+                (cleaned.startsWith('0') && cleaned.length >= 10) ||
+                (cleaned.length >= 10 && /^\d+$/.test(cleaned))
+            );
         }
 
         function showError(message) {

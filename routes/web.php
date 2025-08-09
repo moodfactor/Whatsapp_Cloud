@@ -184,6 +184,13 @@ Route::post('/whatsapp/webhook', function(Request $request, MetaWhatsappService 
                 if (isset($entry['changes'])) {
                     foreach ($entry['changes'] as $change) {
                         if ($change['field'] === 'messages' && isset($change['value']['messages'])) {
+                            // Extract contacts information for profile names
+                            $contacts = $change['value']['contacts'] ?? [];
+                            $contactsMap = [];
+                            foreach ($contacts as $contact) {
+                                $contactsMap[$contact['wa_id']] = $contact['profile']['name'] ?? null;
+                            }
+                            
                             foreach ($change['value']['messages'] as $message) {
                                 $phoneNumber = $message['from'] ?? null;
                                 $messageText = $message['text']['body'] ?? null;
@@ -194,8 +201,13 @@ Route::post('/whatsapp/webhook', function(Request $request, MetaWhatsappService 
                                 if ($phoneNumber) {
                                     Log::info("Processing message from: {$phoneNumber}");
                                     
-                                    // Find or create conversation using the improved method
-                                    $conversation = \App\Models\Conversation::findOrCreateByPhone($phoneNumber, $phoneNumber);
+                                    // Get the WhatsApp profile name from contacts, fallback to phone number
+                                    $profileName = $contactsMap[$phoneNumber] ?? $phoneNumber;
+                                    
+                                    Log::info("Contact profile name: {$profileName}");
+                                    
+                                    // Find or create conversation using profile name
+                                    $conversation = \App\Models\Conversation::findOrCreateByPhone($phoneNumber, $profileName);
 
                                     Log::info("Found/created conversation ID: {$conversation->id}");
 
