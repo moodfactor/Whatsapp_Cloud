@@ -289,7 +289,7 @@ class WhatsAppController extends BaseController
         
         try {
             $file = $request->file('media');
-            $caption = $request->input('caption', '');
+            $caption = $request->input('caption', '') ?? '';
             
             // Get media type from file extension
             $mediaType = $this->whatsappService->getMediaTypeFromExtension($file->getClientOriginalExtension());

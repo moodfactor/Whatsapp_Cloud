@@ -255,41 +255,76 @@ class MetaWhatsappService
     {
         try {
             $cleanPhone = $this->cleanPhoneNumber($to);
+            $accessToken = config('whatsapp.access_token');
+            $phoneNumberId = config('whatsapp.phone_number_id');
             
-            $message = null;
+            if (!$accessToken || !$phoneNumberId) {
+                throw new \Exception('WhatsApp configuration missing');
+            }
+
+            // Build payload based on media type
+            $payload = [
+                'messaging_product' => 'whatsapp',
+                'to' => $cleanPhone,
+                'type' => $mediaType
+            ];
+
             switch ($mediaType) {
                 case 'image':
-                    $message = new ImageMessage($cleanPhone, $mediaId, $caption);
+                    $payload['image'] = ['id' => $mediaId];
+                    if ($caption) {
+                        $payload['image']['caption'] = $caption;
+                    }
                     break;
                 case 'video':
-                    $message = new VideoMessage($cleanPhone, $mediaId, $caption);
+                    $payload['video'] = ['id' => $mediaId];
+                    if ($caption) {
+                        $payload['video']['caption'] = $caption;
+                    }
                     break;
                 case 'document':
-                    $message = new DocumentMessage($cleanPhone, $mediaId, $caption, $filename);
+                    $payload['document'] = ['id' => $mediaId];
+                    if ($caption) {
+                        $payload['document']['caption'] = $caption;
+                    }
+                    if ($filename) {
+                        $payload['document']['filename'] = $filename;
+                    }
                     break;
                 case 'audio':
-                    $message = new AudioMessage($cleanPhone, $mediaId);
+                    $payload['audio'] = ['id' => $mediaId];
                     break;
+                default:
+                    throw new \Exception('Unsupported media type: ' . $mediaType);
             }
 
-            if (!$message) {
-                throw new \Exception('Unsupported media type: ' . $mediaType);
-            }
+            // Send direct API request
+            $response = Http::withToken($accessToken)
+                ->post("https://graph.facebook.com/v17.0/{$phoneNumberId}/messages", $payload);
 
-            $result = $this->whatsapp->sendMessage($message);
+            $responseData = $response->json();
             
-            if ($result) {
-                return [
-                    'success' => true,
-                    'message_id' => is_array($result) && isset($result['messages']) ? $result['messages'][0]['id'] ?? null : null,
-                    'result' => $result
-                ];
-            } else {
-                return [
-                    'success' => false,
-                    'error' => 'WhatsApp API returned false'
-                ];
+            if (!$response->successful()) {
+                $errorMessage = $responseData['error']['message'] ?? 'Unknown error';
+                $errorCode = $responseData['error']['code'] ?? 0;
+                
+                Log::error('WhatsApp API error', [
+                    'error' => $errorMessage, 
+                    'code' => $errorCode,
+                    'payload' => $payload,
+                    'response' => $responseData
+                ]);
+                
+                // Provide helpful error messages
+                $suggestion = $this->getPermissionSuggestion($errorCode);
+                throw new \Exception("WhatsApp API error (#{$errorCode}): {$errorMessage}. {$suggestion}");
             }
+
+            return [
+                'success' => true,
+                'message_id' => $responseData['messages'][0]['id'] ?? null,
+                'result' => $responseData
+            ];
 
         } catch (\Exception $e) {
             Log::error('Send media message error: ' . $e->getMessage());
@@ -476,6 +511,64 @@ class MetaWhatsappService
                 'success' => false,
                 'error' => $e->getMessage()
             ];
+        }
+    }
+
+    /**
+     * Test media upload permissions
+     */
+    public function testMediaPermissions(): array
+    {
+        try {
+            $accessToken = config('whatsapp.access_token');
+            $phoneNumberId = config('whatsapp.phone_number_id');
+            
+            if (!$accessToken || !$phoneNumberId) {
+                throw new \Exception('WhatsApp configuration missing');
+            }
+
+            // Test by trying to get media endpoint info
+            $response = Http::withToken($accessToken)
+                ->get("https://graph.facebook.com/v17.0/{$phoneNumberId}/media");
+
+            $responseData = $response->json();
+            
+            if (!$response->successful()) {
+                $errorMessage = $responseData['error']['message'] ?? 'Unknown error';
+                $errorCode = $responseData['error']['code'] ?? 0;
+                
+                return [
+                    'success' => false,
+                    'error' => "Media permissions error (#{$errorCode}): {$errorMessage}",
+                    'suggestion' => $this->getPermissionSuggestion($errorCode)
+                ];
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Media permissions are valid'
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Media permissions test error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+
+    private function getPermissionSuggestion(int $errorCode): string
+    {
+        switch ($errorCode) {
+            case 10:
+                return 'Your WhatsApp Business Account may not have media messaging permissions. Check your Meta Developer Console and ensure your app has the required permissions.';
+            case 100:
+                return 'Missing required parameters. This usually indicates a configuration issue.';
+            case 190:
+                return 'Access token expired or invalid. Please generate a new access token.';
+            default:
+                return 'Check your WhatsApp Business Account settings and permissions in Meta Developer Console.';
         }
     }
 }

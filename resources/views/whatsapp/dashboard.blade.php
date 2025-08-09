@@ -7,6 +7,9 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
     <script>
     document.addEventListener('alpine:init', () => {
         console.log('Alpine.js initialized');
@@ -660,6 +663,7 @@
                         <button class="action-btn attach-btn" id="attachBtn" onclick="console.log('Attach button clicked!'); openMediaDialog();" disabled>
                             <i class="fas fa-paperclip"></i>
                         </button>
+                        <button onclick="document.querySelector('[x-data*=\"mediaUploadModal\"]')._x_dataStack[0].openDialog(2)" style="background: red; color: white; padding: 10px;">TEST MODAL</button>
                     </div>
                     <input type="text" id="messageInput" placeholder="Type a message..." disabled onkeypress="handleKeyPress(event)">
                     <div class="input-actions">
@@ -698,6 +702,7 @@
         let currentConversation = null;
         let conversations = [];
         let userPermissions = {};
+        let isMediaModalOpen = false;
 
         // CSRF Token setup
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
@@ -1347,15 +1352,17 @@
 
         // Auto-refresh conversations every 5 seconds for real-time updates
         setInterval(() => {
-            if (!document.hidden) {
+            if (!document.hidden && !window.isMediaModalOpen) {
                 loadConversations();
             }
         }, 5000);
 
         // Auto-refresh messages in current conversation every 3 seconds
         setInterval(() => {
-            if (!document.hidden && currentConversation) {
+            if (!document.hidden && currentConversation && !window.isMediaModalOpen) {
                 loadMessages(currentConversation, true); // true = silent refresh
+            } else if (window.isMediaModalOpen) {
+                console.log('Skipping message refresh - modal is open');
             }
         }, 3000);
 
