@@ -38,10 +38,10 @@ class WhatsAppController extends BaseController
             'role' => $admin->role,
             'permissions' => [
                 'role_name' => $this->getRoleName($admin->role),
-                'can_see_all' => in_array($admin->role, ['super_admin', 'admin']),
-                'can_assign' => in_array($admin->role, ['super_admin', 'admin', 'supervisor']),
-                'can_delete' => in_array($admin->role, ['super_admin', 'admin']),
-                'can_see_phone' => ($admin->role === 'super_admin')
+                'can_see_all' => ($admin->role === 'super_admin'), // Only super admin sees all
+                'can_assign' => ($admin->role === 'super_admin'), // Only super admin can assign
+                'can_delete' => ($admin->role === 'super_admin'), // Only super admin can delete
+                'can_see_phone' => ($admin->role === 'super_admin') // Only super admin sees phone numbers
             ]
         ];
         
@@ -52,25 +52,44 @@ class WhatsAppController extends BaseController
 
     public function getConversations(Request $request)
     {
-        // Use exact same logic as AdminController
         $admin = Auth::guard('whatsapp_admin')->user();
         
         if (!$admin) {
             return response()->json(['error' => 'Not authenticated'], 401);
         }
         
-        // Debug logging
-        \Log::info('WhatsApp getConversations Debug:', [
-            'admin_id' => $admin->id,
-            'admin_role' => $admin->role,
-            'admin_data' => $admin->toArray()
-        ]);
+        \Log::info('WhatsApp getConversations for role: ' . $admin->role . ' (ID: ' . $admin->id . ')');
         
         $query = Conversation::with('assignedTo');
         
-        // Apply role-based filtering (same as AdminController)
-        if (!in_array($admin->role, ['super_admin', 'admin'])) {
-            $query->where('assigned_to', $admin->id);
+        // STRICT Role-based filtering according to requirements
+        switch ($admin->role) {
+            case 'super_admin':
+                // Super Admin sees ALL conversations (God Mode)
+                break;
+                
+            case 'supervisor':
+                // Supervisors see:
+                // 1. NEW conversations (unassigned - status = 'new' AND assigned_to = null)
+                // 2. Conversations assigned to them personally
+                $query->where(function($q) use ($admin) {
+                    $q->where(function($subq) {
+                        // New conversations (unassigned)
+                        $subq->where('status', 'new')
+                             ->whereNull('assigned_to');
+                    })->orWhere('assigned_to', $admin->id); // OR assigned to me
+                });
+                break;
+                
+            case 'agent':
+                // Agents see ONLY conversations assigned to them by super admin
+                $query->where('assigned_to', $admin->id);
+                break;
+                
+            default:
+                // Unknown role gets no access
+                $query->where('id', -1); // No results
+                break;
         }
         
         $conversations = $query->orderBy('last_msg_time', 'desc')
@@ -79,7 +98,7 @@ class WhatsAppController extends BaseController
                 $phoneDisplay = CountryService::formatPhoneForDisplay(
                     $conversation->decrypted_phone,
                     $conversation->contact_name,
-                    ($admin->role === 'super_admin')
+                    ($admin->role === 'super_admin') // Only super admin sees real phones
                 );
                 
                 return [
@@ -94,25 +113,23 @@ class WhatsAppController extends BaseController
                     'unread' => $conversation->unread ?? 0,
                     'status' => $conversation->status ?? 'new',
                     'assigned_to' => $conversation->assigned_to,
+                    'assigned_to_name' => $conversation->assignedTo ? $conversation->assignedTo->name : null,
                     'can_see_full_phone' => ($admin->role === 'super_admin'),
                     'full_phone' => ($admin->role === 'super_admin') ? $phoneDisplay['full_phone'] : null,
-                    'debug_admin_role' => $admin->role,
-                    'debug_is_super_admin' => ($admin->role === 'super_admin')
+                    // For supervisor: show if this is a NEW conversation they can claim
+                    'can_claim' => ($admin->role === 'supervisor' && $conversation->status === 'new' && is_null($conversation->assigned_to))
                 ];
             });
         
-        // Create user permissions exactly like AdminController logic
+        // Create user permissions
         $userPermissions = [
             'role_name' => $this->getRoleName($admin->role),
-            'can_see_all' => in_array($admin->role, ['super_admin', 'admin']),
-            'can_assign' => in_array($admin->role, ['super_admin', 'admin', 'supervisor']),
-            'can_delete' => in_array($admin->role, ['super_admin', 'admin']),
+            'can_see_all' => ($admin->role === 'super_admin'),
+            'can_assign' => ($admin->role === 'super_admin'),
+            'can_delete' => ($admin->role === 'super_admin'),
             'can_see_phone' => ($admin->role === 'super_admin'),
-            'debug_admin_role' => $admin->role,
-            'debug_role_check' => in_array($admin->role, ['super_admin', 'admin'])
+            'can_claim' => ($admin->role === 'supervisor')
         ];
-        
-        \Log::info('WhatsApp permissions debug:', $userPermissions);
         
         return response()->json([
             'conversations' => $conversations,
@@ -120,9 +137,91 @@ class WhatsAppController extends BaseController
         ]);
     }
 
+    public function claimConversation(Request $request, $conversationId)
+    {
+        $admin = Auth::guard('whatsapp_admin')->user();
+        
+        if (!$admin || $admin->role !== 'supervisor') {
+            return response()->json(['error' => 'Only supervisors can claim conversations'], 403);
+        }
+        
+        $conversation = Conversation::findOrFail($conversationId);
+        
+        // Can only claim NEW conversations that are unassigned
+        if ($conversation->status !== 'new' || $conversation->assigned_to !== null) {
+            return response()->json(['error' => 'This conversation cannot be claimed'], 400);
+        }
+        
+        // Claim the conversation
+        $conversation->update([
+            'assigned_to' => $admin->id,
+            'status' => 'open'
+        ]);
+        
+        \Log::info("Supervisor {$admin->id} claimed conversation {$conversationId}");
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Conversation claimed successfully',
+            'conversation' => [
+                'id' => $conversation->id,
+                'status' => 'open',
+                'assigned_to' => $admin->id,
+                'assigned_to_name' => $admin->name
+            ]
+        ]);
+    }
+
+    public function assignConversation(Request $request, $conversationId)
+    {
+        $admin = Auth::guard('whatsapp_admin')->user();
+        
+        // Only super admin can assign conversations
+        if (!$admin || $admin->role !== 'super_admin') {
+            return response()->json(['error' => 'Only super admin can assign conversations'], 403);
+        }
+        
+        $request->validate([
+            'assigned_to' => 'nullable|exists:whatsapp_admins,id'
+        ]);
+        
+        $conversation = Conversation::findOrFail($conversationId);
+        
+        $assignedToUserId = $request->input('assigned_to');
+        
+        if ($assignedToUserId) {
+            // Verify the user being assigned to exists and has proper role
+            $assignedUser = \App\Models\WhatsappAdmin::find($assignedToUserId);
+            if (!$assignedUser || !in_array($assignedUser->role, ['supervisor', 'agent'])) {
+                return response()->json(['error' => 'Invalid user for assignment'], 400);
+            }
+            
+            $conversation->update([
+                'assigned_to' => $assignedToUserId,
+                'status' => 'assigned'
+            ]);
+            
+            $message = "Conversation assigned to {$assignedUser->name}";
+        } else {
+            // Unassign conversation
+            $conversation->update([
+                'assigned_to' => null,
+                'status' => 'new'
+            ]);
+            
+            $message = "Conversation unassigned";
+        }
+        
+        \Log::info("Super admin {$admin->id} assigned conversation {$conversationId} to user {$assignedToUserId}");
+        
+        return response()->json([
+            'success' => true,
+            'message' => $message
+        ]);
+    }
+
     public function getMessages(Request $request, $conversationId)
     {
-        // Use same authentication pattern as getConversations
         $admin = Auth::guard('whatsapp_admin')->user();
         
         if (!$admin) {
@@ -131,8 +230,30 @@ class WhatsAppController extends BaseController
         
         $conversation = Conversation::findOrFail($conversationId);
         
-        // Check if user can access this conversation (same logic as AdminController)
-        if (!in_array($admin->role, ['super_admin', 'admin']) && $conversation->assigned_to !== $admin->id) {
+        // Check if user can access this conversation based on role
+        $canAccess = false;
+        
+        switch ($admin->role) {
+            case 'super_admin':
+                // Super admin can see all conversations
+                $canAccess = true;
+                break;
+                
+            case 'supervisor':
+                // Supervisor can see: NEW conversations OR conversations assigned to them
+                $canAccess = (
+                    ($conversation->status === 'new' && is_null($conversation->assigned_to)) ||
+                    ($conversation->assigned_to === $admin->id)
+                );
+                break;
+                
+            case 'agent':
+                // Agent can only see conversations assigned to them
+                $canAccess = ($conversation->assigned_to === $admin->id);
+                break;
+        }
+        
+        if (!$canAccess) {
             return response()->json(['error' => 'Access denied'], 403);
         }
         
@@ -151,7 +272,6 @@ class WhatsAppController extends BaseController
                     'filename' => $message->filename ?? null,
                     'mime_type' => $message->mime_type ?? null,
                     'file_size' => $message->file_size ?? null,
-                    // Debug info to help troubleshoot
                     'debug_type' => $message->type,
                     'debug_has_url' => !empty($message->url)
                 ];
@@ -171,14 +291,16 @@ class WhatsAppController extends BaseController
                 'contact_phone' => $phoneDisplay['display_phone'],
                 'country_flag' => $phoneDisplay['country_flag'],
                 'country_name' => $phoneDisplay['country_name'],
-                'status' => $conversation->status
+                'status' => $conversation->status,
+                'assigned_to' => $conversation->assigned_to,
+                'assigned_to_name' => $conversation->assignedTo ? $conversation->assignedTo->name : null,
+                'can_claim' => ($admin->role === 'supervisor' && $conversation->status === 'new' && is_null($conversation->assigned_to))
             ]
         ]);
     }
 
     public function sendMessage(Request $request)
     {
-        // Use same authentication pattern as other methods
         $admin = Auth::guard('whatsapp_admin')->user();
         
         if (!$admin) {
@@ -192,16 +314,37 @@ class WhatsAppController extends BaseController
         
         $conversation = Conversation::findOrFail($request->conversation_id);
         
-        // Check if user can access this conversation
-        if (!in_array($admin->role, ['super_admin', 'admin']) && $conversation->assigned_to !== $admin->id) {
-            return response()->json(['error' => 'Access denied'], 403);
+        // Check if user can send messages to this conversation
+        $canSend = false;
+        
+        switch ($admin->role) {
+            case 'super_admin':
+                // Super admin can send to any conversation
+                $canSend = true;
+                break;
+                
+            case 'supervisor':
+                // Supervisor can send only to conversations assigned to them
+                // (they must claim NEW conversations first)
+                $canSend = ($conversation->assigned_to === $admin->id);
+                break;
+                
+            case 'agent':
+                // Agent can only send to conversations assigned to them
+                $canSend = ($conversation->assigned_to === $admin->id);
+                break;
+        }
+        
+        if (!$canSend) {
+            return response()->json(['error' => 'You can only send messages to conversations assigned to you'], 403);
         }
         
         try {
             \Log::info('Sending WhatsApp message:', [
                 'to' => $conversation->decrypted_phone,
                 'message' => $request->message,
-                'conversation_id' => $conversation->id
+                'conversation_id' => $conversation->id,
+                'sent_by' => $admin->id
             ]);
             
             // Send message via WhatsApp API
@@ -209,11 +352,6 @@ class WhatsAppController extends BaseController
                 $conversation->decrypted_phone,
                 $request->message
             );
-            
-            \Log::info('WhatsApp API Result:', [
-                'success' => !!$result,
-                'result' => $result
-            ]);
             
             // Determine status based on API result
             $status = $result ? 'sent' : 'failed';
@@ -282,9 +420,21 @@ class WhatsAppController extends BaseController
         
         $conversation = Conversation::findOrFail($request->conversation_id);
         
-        // Check permissions
-        if (!in_array($admin->role, ['super_admin', 'admin']) && $conversation->assigned_to !== $admin->id) {
-            return response()->json(['error' => 'Access denied'], 403);
+        // Check permissions (same logic as sendMessage)
+        $canSend = false;
+        
+        switch ($admin->role) {
+            case 'super_admin':
+                $canSend = true;
+                break;
+            case 'supervisor':
+            case 'agent':
+                $canSend = ($conversation->assigned_to === $admin->id);
+                break;
+        }
+        
+        if (!$canSend) {
+            return response()->json(['error' => 'You can only send media to conversations assigned to you'], 403);
         }
         
         try {
@@ -395,9 +545,9 @@ class WhatsAppController extends BaseController
                 'role' => $admin->role ?? 'agent',
                 'permissions' => [
                     'role_name' => $this->getRoleName($admin->role ?? 'agent'),
-                    'can_see_all' => in_array($admin->role, ['super_admin', 'admin']),
-                    'can_assign' => in_array($admin->role, ['super_admin', 'admin', 'supervisor']),
-                    'can_delete' => in_array($admin->role, ['super_admin', 'admin']),
+                    'can_see_all' => ($admin->role === 'super_admin'),
+                    'can_assign' => ($admin->role === 'super_admin'),
+                    'can_delete' => ($admin->role === 'super_admin'),
                     'can_see_phone' => ($admin->role === 'super_admin')
                 ]
             ];
@@ -505,10 +655,11 @@ class WhatsAppController extends BaseController
                         $conversation = Conversation::firstOrCreate(
                             ['receiver_id' => $phoneNumber],
                             [
-                                'contact_name' => $phoneNumber,
+                                'name' => $phoneNumber,
                                 'last_message' => $this->getMessagePreview($message, $messageType),
                                 'last_msg_time' => now(),
-                                'status' => 'active'
+                                'status' => 'new', // New conversations start as 'new' so supervisors can claim them
+                                'assigned_to' => null // Unassigned initially
                             ]
                         );
 
@@ -533,12 +684,14 @@ class WhatsAppController extends BaseController
                         // Update conversation
                         $conversation->update([
                             'last_message' => $messageData['text'],
-                            'last_msg_time' => now()
+                            'last_msg_time' => now(),
+                            'unread' => ($conversation->unread ?? 0) + 1
                         ]);
 
                         \Log::info("Processed WhatsApp {$messageType} message from {$phoneNumber}", [
                             'message_id' => $dbMessage->id,
-                            'has_media' => !empty($messageData['media_url'])
+                            'conversation_status' => $conversation->status,
+                            'assigned_to' => $conversation->assigned_to
                         ]);
                     }
                 }

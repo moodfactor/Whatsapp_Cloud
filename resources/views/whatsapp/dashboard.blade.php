@@ -96,6 +96,12 @@
             background: #e7f3ff;
             border-right: 3px solid #128C7E;
         }
+        .conversation.new {
+            background: #e8f5e8;
+        }
+        .conversation.new:hover {
+            background: #d4f4d4;
+        }
         .conversation-header {
             display: flex;
             justify-content: space-between;
@@ -149,6 +155,42 @@
             justify-content: center;
             font-size: 12px;
             font-weight: 600;
+            margin-left: 8px;
+        }
+        .new-conversation-badge {
+            background: #ff9800;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 8px;
+        }
+        .claim-badge {
+            background: #2196f3;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .claim-badge:hover {
+            background: #1976d2;
+            transform: scale(1.05);
+        }
+        .assigned-badge {
+            background: #4caf50;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
             margin-left: 8px;
         }
         .chat-header { 
@@ -614,14 +656,38 @@
                         <h3>{{ $user['name'] }}</h3>
                         <span class="role-badge role-{{ str_replace(' ', '-', strtolower($user['permissions']['role_name'])) }}">{{ $user['permissions']['role_name'] }}</span>
                         <div class="permissions">
-                            <div class="permission-item">
-                                <i class="fas {{ $user['permissions']['can_see_all'] ? 'fa-check-circle permission-icon' : 'fa-exclamation-triangle permission-icon warning' }}"></i>
-                                <span>{{ $user['permissions']['can_see_all'] ? 'Can see all conversations' : 'Limited to assigned conversations' }}</span>
-                            </div>
-                            <div class="permission-item">
-                                <i class="fas {{ $user['permissions']['can_see_phone'] ? 'fa-check-circle permission-icon' : 'fa-eye-slash permission-icon warning' }}"></i>
-                                <span>{{ $user['permissions']['can_see_phone'] ? 'Can see phone numbers' : 'Phone numbers are masked' }}</span>
-                            </div>
+                            @if ($user['permissions']['role_name'] === 'Super Admin')
+                                <div class="permission-item">
+                                    <i class="fas fa-crown permission-icon"></i>
+                                    <span>God Mode - See all conversations & history</span>
+                                </div>
+                                <div class="permission-item">
+                                    <i class="fas fa-user-cog permission-icon"></i>
+                                    <span>Can assign conversations to supervisors/agents</span>
+                                </div>
+                                <div class="permission-item">
+                                    <i class="fas fa-eye permission-icon"></i>
+                                    <span>Can see actual phone numbers</span>
+                                </div>
+                            @elseif ($user['permissions']['role_name'] === 'Supervisor')
+                                <div class="permission-item">
+                                    <i class="fas fa-hand-paper permission-icon"></i>
+                                    <span>Can claim NEW conversations</span>
+                                </div>
+                                <div class="permission-item">
+                                    <i class="fas fa-eye-slash permission-icon warning"></i>
+                                    <span>Phone numbers are masked</span>
+                                </div>
+                            @else
+                                <div class="permission-item">
+                                    <i class="fas fa-user permission-icon warning"></i>
+                                    <span>Only assigned conversations</span>
+                                </div>
+                                <div class="permission-item">
+                                    <i class="fas fa-eye-slash permission-icon warning"></i>
+                                    <span>Phone numbers are masked</span>
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -654,16 +720,21 @@
                 <div class="empty-state">
                     <i class="fab fa-whatsapp"></i>
                     <h3>WhatsApp Business Chat</h3>
-                    <p>Select a conversation from the sidebar to start messaging your customers</p>
+                    @if ($user['permissions']['role_name'] === 'Super Admin')
+                        <p>You have God Mode access - select any conversation to monitor or manage</p>
+                    @elseif ($user['permissions']['role_name'] === 'Supervisor')
+                        <p>Claim NEW conversations or continue with assigned ones</p>
+                    @else
+                        <p>Select a conversation assigned to you to start messaging</p>
+                    @endif
                 </div>
             </div>
             <div class="message-input-container">
                 <div class="message-input">
                     <div class="input-actions">
-                        <button class="action-btn attach-btn" id="attachBtn" onclick="console.log('Attach button clicked!'); openMediaDialog();" disabled>
+                        <button class="action-btn attach-btn" id="attachBtn" onclick="openMediaDialog();" disabled>
                             <i class="fas fa-paperclip"></i>
                         </button>
-                        <button onclick="document.querySelector('[x-data*=\"mediaUploadModal\"]')._x_dataStack[0].openDialog(2)" style="background: red; color: white; padding: 10px;">TEST MODAL</button>
                     </div>
                     <input type="text" id="messageInput" placeholder="Type a message..." disabled onkeypress="handleKeyPress(event)">
                     <div class="input-actions">
@@ -676,21 +747,8 @@
         </div>
     </div>
 
-    <!-- Media Upload Modal (Simple Alpine.js) -->
+    <!-- Media Upload Modal -->
     @include('components.media-upload-modal')
-    
-    <!-- Debug: Check if modal is included -->
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const modal = document.querySelector('[x-data="mediaUploadModal()"]');
-        console.log('Media modal element found:', !!modal);
-        if (modal) {
-            console.log('Modal element:', modal);
-        } else {
-            console.error('Media upload modal not found in DOM');
-        }
-    });
-    </script>
 
     <!-- Image Modal -->
     <div class="image-modal" id="imageModal" onclick="closeImageModal()">
@@ -710,14 +768,6 @@
         // Load conversations on page load
         window.addEventListener('load', function() {
             loadConversations();
-            
-            // Debug: Check attach button state periodically
-            setInterval(() => {
-                const attachBtn = document.getElementById('attachBtn');
-                if (attachBtn && !attachBtn.disabled && currentConversation) {
-                    console.log('Attach button is ready - enabled:', !attachBtn.disabled, 'conversation:', currentConversation);
-                }
-            }, 3000);
         });
 
         async function loadConversations() {
@@ -738,9 +788,11 @@
                 conversations = data.conversations || [];
                 userPermissions = data.user_permissions || {};
                 
-                // Debug: Log received data
-                console.log('Debug - User Permissions:', userPermissions);
-                console.log('Debug - First conversation:', conversations[0]);
+                console.log('Loaded conversations with permissions:', {
+                    role: userPermissions.role_name,
+                    conversationCount: conversations.length,
+                    canClaim: userPermissions.can_claim
+                });
                 
                 displayConversations();
             } catch (error) {
@@ -753,11 +805,22 @@
             const container = document.getElementById('conversations');
             
             if (conversations.length === 0) {
+                let emptyMessage = 'No conversations yet';
+                let emptyDescription = 'Conversations will appear here when customers message you';
+                
+                if (userPermissions.role_name === 'Supervisor') {
+                    emptyMessage = 'No conversations available';
+                    emptyDescription = 'NEW conversations will appear here for you to claim';
+                } else if (userPermissions.role_name === 'Agent') {
+                    emptyMessage = 'No assigned conversations';
+                    emptyDescription = 'Wait for an admin to assign conversations to you';
+                }
+                
                 container.innerHTML = `
                     <div class="empty-state" style="padding: 40px 20px; text-align: center;">
                         <i class="fas fa-comments" style="font-size: 48px; color: #d1d7db; margin-bottom: 16px;"></i>
-                        <h4 style="color: #667781; margin-bottom: 8px;">No conversations yet</h4>
-                        <p style="color: #8696a0; font-size: 14px;">Conversations will appear here when customers message you</p>
+                        <h4 style="color: #667781; margin-bottom: 8px;">${emptyMessage}</h4>
+                        <p style="color: #8696a0; font-size: 14px;">${emptyDescription}</p>
                     </div>
                 `;
                 return;
@@ -768,7 +831,11 @@
             conversations.forEach(conv => {
                 const div = document.createElement('div');
                 div.className = 'conversation';
-                div.onclick = () => selectConversation(conv.id);
+                
+                // Add special styling for NEW conversations that supervisors can claim
+                if (conv.can_claim) {
+                    div.classList.add('new');
+                }
                 
                 const isArabText = conv.is_arab ? 'arab-text' : '';
                 const timeAgo = formatTimeAgo(conv.last_msg_time);
@@ -777,6 +844,18 @@
                 const displayPhone = userPermissions.can_see_phone && conv.full_phone 
                     ? conv.full_phone 
                     : conv.contact_phone;
+                
+                // Create status badge
+                let statusBadge = '';
+                if (conv.can_claim) {
+                    statusBadge = `<span class="claim-badge" onclick="claimConversation(${conv.id}, event)" title="Click to claim this conversation">CLAIM</span>`;
+                } else if (conv.status === 'new' && !conv.assigned_to) {
+                    statusBadge = `<span class="new-conversation-badge">NEW</span>`;
+                } else if (conv.assigned_to_name) {
+                    statusBadge = `<span class="assigned-badge">@${conv.assigned_to_name}</span>`;
+                }
+                
+                div.onclick = () => selectConversation(conv.id);
                 
                 div.innerHTML = `
                     <div class="conversation-header">
@@ -787,8 +866,9 @@
                                 <div class="contact-phone">${escapeHtml(displayPhone)}</div>
                             </div>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 4px;">
+                        <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
                             ${conv.unread > 0 ? `<div class="unread-badge">${conv.unread}</div>` : ''}
+                            ${statusBadge}
                             <div class="conversation-time">${timeAgo}</div>
                         </div>
                     </div>
@@ -799,12 +879,62 @@
             });
         }
 
+        async function claimConversation(conversationId, event) {
+            // Prevent the conversation from being selected when clicking claim button
+            event.stopPropagation();
+            
+            if (!userPermissions.can_claim) {
+                showError('You do not have permission to claim conversations');
+                return;
+            }
+            
+            const claimBtn = event.target;
+            const originalText = claimBtn.textContent;
+            claimBtn.textContent = 'Claiming...';
+            claimBtn.style.pointerEvents = 'none';
+            
+            try {
+                const response = await fetch(`/api/whatsapp/conversations/${conversationId}/claim`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Show success message
+                    showSuccess('Conversation claimed successfully!');
+                    
+                    // Refresh conversations to show the updated state
+                    await loadConversations();
+                    
+                    // Auto-select the claimed conversation
+                    setTimeout(() => {
+                        selectConversation(conversationId);
+                    }, 500);
+                } else {
+                    throw new Error(data.error || 'Failed to claim conversation');
+                }
+            } catch (error) {
+                console.error('Error claiming conversation:', error);
+                showError(error.message || 'Failed to claim conversation');
+                
+                // Reset button state
+                claimBtn.textContent = originalText;
+                claimBtn.style.pointerEvents = 'auto';
+            }
+        }
+
         async function selectConversation(id) {
             // Remove active class from all conversations
             document.querySelectorAll('.conversation').forEach(el => el.classList.remove('active'));
             
             // Add active class to selected conversation
-            event.target.closest('.conversation').classList.add('active');
+            const selectedDiv = document.querySelector(`[onclick="selectConversation(${id})"]`);
+            if (selectedDiv) selectedDiv.classList.add('active');
             
             currentConversation = id;
             const conv = conversations.find(c => c.id === id);
@@ -813,23 +943,55 @@
             
             // Update chat header
             const isArabText = conv.is_arab ? 'arab-text' : '';
-            document.getElementById('chat-header').innerHTML = `
+            let headerContent = `
                 <button class="back-btn" id="backBtn" onclick="showSidebar()" style="display: none; background: none; border: none; cursor: pointer; padding: 8px; margin-right: 12px;">
                     <i class="fas fa-arrow-left" style="color: #54656f;"></i>
                 </button>
                 <span class="country-flag" style="font-size: 20px; margin-right: 8px;">${conv.country_flag || '🌍'}</span>
                 <div class="chat-contact-info">
                     <div class="chat-contact-name ${isArabText}">${escapeHtml(conv.contact_name)}</div>
-                    <div class="chat-contact-phone">${escapeHtml(userPermissions.can_see_phone && conv.full_phone ? conv.full_phone : conv.contact_phone)} • ${conv.country_name || 'Unknown'}</div>
-                </div>
-            `;
+                    <div class="chat-contact-phone">${escapeHtml(userPermissions.can_see_phone && conv.full_phone ? conv.full_phone : conv.contact_phone)} • ${conv.country_name || 'Unknown'}`;
             
-            // Enable inputs
-            document.getElementById('messageInput').disabled = false;
-            document.getElementById('sendBtn').disabled = false;
+            // Add assignment info for super admin
+            if (userPermissions.role_name === 'Super Admin') {
+                if (conv.assigned_to_name) {
+                    headerContent += ` • Assigned to: ${conv.assigned_to_name}`;
+                } else {
+                    headerContent += ` • Unassigned`;
+                }
+            }
+            
+            headerContent += `</div></div>`;
+            
+            document.getElementById('chat-header').innerHTML = headerContent;
+            
+            // Enable/disable inputs based on permissions
+            const messageInput = document.getElementById('messageInput');
+            const sendBtn = document.getElementById('sendBtn');
             const attachBtn = document.getElementById('attachBtn');
-            attachBtn.disabled = false;
-            console.log('Conversation selected, attach button enabled:', !attachBtn.disabled, 'conversation ID:', id);
+            
+            // Determine if user can send messages to this conversation
+            let canSendMessages = false;
+            
+            if (userPermissions.role_name === 'Super Admin') {
+                canSendMessages = true; // Super admin can send to any conversation
+            } else if (userPermissions.role_name === 'Supervisor') {
+                canSendMessages = (conv.assigned_to === parseInt('{{ $user["id"] }}')); // Only assigned conversations
+            } else if (userPermissions.role_name === 'Agent') {
+                canSendMessages = (conv.assigned_to === parseInt('{{ $user["id"] }}')); // Only assigned conversations
+            }
+            
+            messageInput.disabled = !canSendMessages;
+            sendBtn.disabled = !canSendMessages;
+            attachBtn.disabled = !canSendMessages;
+            
+            if (!canSendMessages && conv.can_claim) {
+                messageInput.placeholder = "Claim this conversation first to start messaging";
+            } else if (!canSendMessages) {
+                messageInput.placeholder = "You cannot send messages to this conversation";
+            } else {
+                messageInput.placeholder = "Type a message...";
+            }
             
             // Load messages
             await loadMessages(id);
@@ -854,22 +1016,7 @@
                 
                 const data = await response.json();
                 const messages = data.messages || [];
-                
-                // Debug: Log all messages to see their structure
-                console.log('Loaded messages for conversation:', conversationId, messages);
-                messages.forEach((msg, index) => {
-                    if (msg.debug_type !== 'text') {
-                        console.log(`Message ${index}:`, {
-                            id: msg.id,
-                            text: msg.text,
-                            message_type: msg.message_type,
-                            debug_type: msg.debug_type,
-                            debug_has_url: msg.debug_has_url,
-                            media_url: msg.media_url,
-                            filename: msg.filename
-                        });
-                    }
-                });
+                const conversation = data.conversation || {};
 
                 const container = document.getElementById('messages');
                 
@@ -881,7 +1028,6 @@
                 if (silentRefresh) {
                     const currentMessageCount = container.children.length - (container.querySelector('.empty-state') ? 1 : 0);
                     if (messages.length > currentMessageCount) {
-                        // Flash a subtle indicator for new messages
                         showNewMessageIndicator();
                     }
                 }
@@ -889,11 +1035,21 @@
                 container.innerHTML = '';
 
                 if (messages.length === 0) {
+                    let emptyMessage = 'No messages yet';
+                    let emptyDescription = 'Start the conversation by sending a message';
+                    
+                    if (conversation.can_claim) {
+                        emptyMessage = 'New conversation available';
+                        emptyDescription = 'Claim this conversation to start messaging';
+                    } else if (!document.getElementById('messageInput').disabled === false) {
+                        emptyDescription = 'This conversation is not assigned to you';
+                    }
+                    
                     container.innerHTML = `
                         <div class="empty-state">
                             <i class="fas fa-comment-dots"></i>
-                            <h4>No messages yet</h4>
-                            <p>Start the conversation by sending a message</p>
+                            <h4>${emptyMessage}</h4>
+                            <p>${emptyDescription}</p>
                         </div>
                     `;
                     return;
@@ -969,7 +1125,11 @@
                 
             } catch (error) {
                 console.error('Error loading messages:', error);
-                showError('Failed to load messages.');
+                if (error.message.includes('403')) {
+                    showError('You do not have permission to view this conversation');
+                } else {
+                    showError('Failed to load messages.');
+                }
             }
         }
 
@@ -1058,66 +1218,6 @@
             }
         }
 
-        async function handleFileUpload(event) {
-            const file = event.target.files[0];
-            if (!file || !currentConversation) return;
-            
-            // Check file size (16MB limit)
-            if (file.size > 16 * 1024 * 1024) {
-                showError('File size must be less than 16MB');
-                return;
-            }
-            
-            const formData = new FormData();
-            formData.append('media', file);
-            formData.append('conversation_id', currentConversation);
-            
-            try {
-                // Show uploading message
-                addMessageToUI({
-                    text: `Uploading ${file.name}...`,
-                    type: 'sent',
-                    time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
-                    status: 'sending'
-                });
-                
-                const response = await fetch('/api/whatsapp/upload-media', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Accept': 'application/json',
-                    },
-                    body: formData
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    // Remove the uploading message and add the actual media message
-                    const messages = document.getElementById('messages');
-                    const lastMessage = messages.lastElementChild;
-                    if (lastMessage) lastMessage.remove();
-                    
-                    // Add the media message
-                    addMessageToUI(data.message);
-                    
-                    // Refresh conversations
-                    loadConversations();
-                } else {
-                    updateLastMessageStatus('failed');
-                    showError(data.error || 'Failed to send media');
-                }
-                
-            } catch (error) {
-                console.error('Error uploading media:', error);
-                updateLastMessageStatus('failed');
-                showError('Failed to send media. Please try again.');
-            }
-            
-            // Clear file input
-            event.target.value = '';
-        }
-
         function addMessageToUI(message) {
             const container = document.getElementById('messages');
             
@@ -1178,37 +1278,17 @@
 
         // Media dialog functions
         function openMediaDialog() {
-            console.log('openMediaDialog called', { currentConversation });
-            
             if (!currentConversation) {
                 showError('Please select a conversation first');
                 return;
             }
-            
-            console.log('Dispatching media dialog event');
             
             // Use Alpine.js event system
             const event = new CustomEvent('open-media-dialog', {
                 detail: { conversationId: currentConversation }
             });
             
-            console.log('Event created:', event);
             window.dispatchEvent(event);
-            
-            // Fallback - try to open the modal directly
-            setTimeout(() => {
-                const modalElement = document.querySelector('[x-data*="mediaUploadModal"]');
-                console.log('Found modal element, trying to open directly');
-                if (modalElement && modalElement._x_dataStack && modalElement._x_dataStack[0]) {
-                    modalElement._x_dataStack[0].openDialog(currentConversation);
-                } else if (modalElement && window.Alpine) {
-                    // Try Alpine's $data approach
-                    const alpineData = window.Alpine.$data(modalElement);
-                    if (alpineData && alpineData.openDialog) {
-                        alpineData.openDialog(currentConversation);
-                    }
-                }
-            }, 100);
         }
 
         // Image modal functions
@@ -1266,10 +1346,9 @@
                 }
             });
 
-            // Listen for media sent event (from simple modal)
+            // Listen for media sent event
             window.addEventListener('media-sent', function(event) {
                 const message = event.detail;
-                // Add the message to the UI immediately
                 addMessageToUI(message);
                 
                 // Refresh messages to sync with server
@@ -1280,23 +1359,14 @@
                 }, 1000);
             });
 
-            // Optional: Listen for Livewire events if available (for backward compatibility)
-            if (typeof Livewire !== 'undefined') {
-                document.addEventListener('livewire:load', function () {
-                    Livewire.on('mediaSent', message => {
-                        addMessageToUI(message);
-                        setTimeout(() => {
-                            if (currentConversation) {
-                                loadMessages(currentConversation, true);
-                            }
-                        }, 1000);
-                    });
-
-                    Livewire.on('showError', message => {
-                        showError(message);
-                    });
-                });
-            }
+            // Enter key to send message
+            const messageInput = document.getElementById('messageInput');
+            messageInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
         });
 
         function formatTimeAgo(dateString) {
@@ -1324,15 +1394,29 @@
         }
 
         function showError(message) {
-            // Simple error display - could be enhanced with better UI
             const errorDiv = document.createElement('div');
             errorDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #f44336; color: white; padding: 12px 20px; border-radius: 4px; z-index: 9999; font-size: 14px;';
             errorDiv.textContent = message;
             document.body.appendChild(errorDiv);
             
             setTimeout(() => {
-                document.body.removeChild(errorDiv);
+                if (errorDiv.parentNode) {
+                    document.body.removeChild(errorDiv);
+                }
             }, 5000);
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.createElement('div');
+            successDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #4caf50; color: white; padding: 12px 20px; border-radius: 4px; z-index: 9999; font-size: 14px;';
+            successDiv.textContent = message;
+            document.body.appendChild(successDiv);
+            
+            setTimeout(() => {
+                if (successDiv.parentNode) {
+                    document.body.removeChild(successDiv);
+                }
+            }, 3000);
         }
 
         // Mobile responsiveness
@@ -1361,21 +1445,8 @@
         setInterval(() => {
             if (!document.hidden && currentConversation && !window.isMediaModalOpen) {
                 loadMessages(currentConversation, true); // true = silent refresh
-            } else if (window.isMediaModalOpen) {
-                console.log('Skipping message refresh - modal is open');
             }
         }, 3000);
-
-        // Enter key to send message
-        document.addEventListener('DOMContentLoaded', function() {
-            const messageInput = document.getElementById('messageInput');
-            messageInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                }
-            });
-        });
 
         // Handle window resize
         window.addEventListener('resize', function() {

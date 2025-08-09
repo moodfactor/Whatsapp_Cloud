@@ -85,11 +85,15 @@ Route::middleware(['web', 'auth:whatsapp_admin'])->group(function () {
         Route::get('/whatsapp/messages/{conversationId}', [WhatsAppController::class, 'getMessages']);
         Route::post('/whatsapp/send-message', [WhatsAppController::class, 'sendMessage']);
         Route::post('/whatsapp/upload-media', [WhatsAppController::class, 'uploadMedia']);
+        
+        // Conversation management routes
+        Route::post('/whatsapp/conversations/{conversationId}/claim', [WhatsAppController::class, 'claimConversation']);
+        Route::post('/whatsapp/conversations/{conversationId}/assign', [WhatsAppController::class, 'assignConversation']);
+        
+        // Legacy compatibility routes
         Route::post('/whatsapp/send-text', [WhatsAppController::class, 'sendText']);
         Route::post('/whatsapp/send-media', [WhatsAppController::class, 'sendMedia']);
         Route::get('/whatsapp/messages', [WhatsAppController::class, 'getMessages']);
-        
-        // Legacy compatibility routes
         Route::get('/whatsapp/interactions', [WhatsAppController::class, 'getConversations']);
         Route::get('/whatsapp/interactions/{id}/messages', [WhatsAppController::class, 'getMessages']);
     });
