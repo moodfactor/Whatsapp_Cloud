@@ -375,10 +375,20 @@
     <!-- Main Content -->
     <div class="main-content">
         <div class="header">
-            <h1>Conversations</h1>
+            <h1>
+                @if(in_array($admin->role, ['super_admin', 'admin']))
+                    All Conversations
+                @else
+                    My Conversations
+                @endif
+            </h1>
             <div>
                 <span style="color: #666; font-size: 14px;">
-                    {{ $conversations->total() }} total conversations
+                    @if(in_array($admin->role, ['super_admin', 'admin']))
+                        {{ $conversations->total() }} total conversations
+                    @else
+                        {{ $conversations->total() }} assigned to me
+                    @endif
                 </span>
             </div>
         </div>
@@ -399,7 +409,13 @@
         <div class="stats-row">
             <div class="stat-card">
                 <h3>{{ $stats['total'] ?? 0 }}</h3>
-                <p>Total</p>
+                <p>
+                    @if(in_array($admin->role, ['super_admin', 'admin']))
+                        Total
+                    @else
+                        Mine
+                    @endif
+                </p>
             </div>
             <div class="stat-card">
                 <h3>{{ $stats['new'] ?? 0 }}</h3>
@@ -460,7 +476,13 @@
 
         <div class="card">
             <div class="card-header">
-                <h3>All Conversations</h3>
+                <h3>
+                    @if(in_array($admin->role, ['super_admin', 'admin']))
+                        All Conversations
+                    @else
+                        My Conversations
+                    @endif
+                </h3>
                 <div>
                     <button onclick="toggleBulkActions()" class="btn btn-warning btn-sm">
                         <i class="fas fa-tasks"></i> Bulk Actions

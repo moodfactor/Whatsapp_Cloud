@@ -362,7 +362,7 @@
 
         <!-- Statistics -->
         <div class="stats-grid">
-            @if(in_array($admin->role ?? 'agent', ['super_admin', 'admin']))
+            @if(($stats['show_user_stats'] ?? false))
             <div class="stat-card">
                 <div class="stat-icon users">
                     <i class="fas fa-users"></i>
@@ -380,7 +380,13 @@
                 </div>
                 <div class="stat-info">
                     <h3>{{ $stats['total_conversations'] ?? 0 }}</h3>
-                    <p>Total Conversations ({{ $stats['active_conversations'] ?? 0 }} active)</p>
+                    <p>
+                        @if(in_array($admin->role ?? 'agent', ['super_admin', 'admin']))
+                            Total Conversations ({{ $stats['active_conversations'] ?? 0 }} active)
+                        @else
+                            My Conversations ({{ $stats['active_conversations'] ?? 0 }} active)
+                        @endif
+                    </p>
                 </div>
             </div>
             
@@ -390,7 +396,13 @@
                 </div>
                 <div class="stat-info">
                     <h3>{{ $stats['total_messages'] ?? 0 }}</h3>
-                    <p>Total Messages ({{ $stats['messages_today'] ?? 0 }} today)</p>
+                    <p>
+                        @if(in_array($admin->role ?? 'agent', ['super_admin', 'admin']))
+                            Total Messages ({{ $stats['messages_today'] ?? 0 }} today)
+                        @else
+                            My Messages ({{ $stats['messages_today'] ?? 0 }} today)
+                        @endif
+                    </p>
                 </div>
             </div>
             
@@ -400,7 +412,13 @@
                 </div>
                 <div class="stat-info">
                     <h3>{{ $stats['messages_this_week'] ?? 0 }}</h3>
-                    <p>Messages This Week</p>
+                    <p>
+                        @if(in_array($admin->role ?? 'agent', ['super_admin', 'admin']))
+                            Messages This Week
+                        @else
+                            My Messages This Week
+                        @endif
+                    </p>
                 </div>
             </div>
         </div>
@@ -410,8 +428,20 @@
             <!-- Recent Conversations -->
             <div class="content-card">
                 <div class="card-header">
-                    <h3>Recent Conversations</h3>
-                    <a href="{{ route('admin.conversations') }}" class="btn btn-primary">View All</a>
+                    <h3>
+                        @if(in_array($admin->role ?? 'agent', ['super_admin', 'admin']))
+                            Recent Conversations
+                        @else
+                            My Recent Conversations
+                        @endif
+                    </h3>
+                    <a href="{{ route('admin.conversations') }}" class="btn btn-primary">
+                        @if(in_array($admin->role ?? 'agent', ['super_admin', 'admin']))
+                            View All
+                        @else
+                            View Mine
+                        @endif
+                    </a>
                 </div>
                 <div class="card-content">
                     @if(count($recentConversations ?? []) > 0)

@@ -260,9 +260,11 @@ class AdminController extends BaseController
         if (in_array($admin->role, ['super_admin', 'admin'])) {
             $stats['total_users'] = WhatsappAdmin::count();
             $stats['active_users'] = WhatsappAdmin::where('status', 'active')->count();
+            $stats['show_user_stats'] = true;
         } else {
             $stats['total_users'] = 0;
             $stats['active_users'] = 0;
+            $stats['show_user_stats'] = false;
         }
         
         // Conversations statistics
@@ -272,7 +274,7 @@ class AdminController extends BaseController
         }
         
         $stats['total_conversations'] = $conversationQuery->count();
-        $stats['active_conversations'] = $conversationQuery->whereIn('status', ['new', 'open'])->count();
+        $stats['active_conversations'] = $conversationQuery->whereIn('status', ['new', 'open', 'assigned'])->count();
         $stats['unread_conversations'] = $conversationQuery->where('unread', '>', 0)->count();
         
         // Messages statistics
