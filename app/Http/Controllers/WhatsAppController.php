@@ -582,12 +582,18 @@ class WhatsAppController extends BaseController
             case 'image':
                 $result['text'] = $message['image']['caption'] ?? '[Image]';
                 if (isset($message['image']['id'])) {
+                    \Log::info('Attempting to download image with ID: ' . $message['image']['id']);
                     $mediaData = $this->whatsappService->downloadMedia($message['image']['id']);
+                    \Log::info('Media download result:', $mediaData);
+                    
                     if ($mediaData['success']) {
                         $result['media_url'] = $mediaData['full_url'];
                         $result['filename'] = $mediaData['filename'];
                         $result['mime_type'] = $mediaData['mime_type'];
                         $result['file_size'] = $mediaData['file_size'];
+                        \Log::info('Image download successful: ' . $mediaData['full_url']);
+                    } else {
+                        \Log::error('Image download failed: ' . ($mediaData['error'] ?? 'Unknown error'));
                     }
                 }
                 break;

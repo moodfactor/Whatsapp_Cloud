@@ -4092,3 +4092,24 @@
 #35 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/artisan(35): Illuminate\\Foundation\\Console\\Kernel->handle()
 #36 {main}
 "} 
+[2025-08-09 05:30:06] production.ERROR: Command "config:show" is not defined.
+
+Did you mean one of these?
+    config:cache
+    config:clear
+    db:show
+    model:show {"exception":"[object] (Symfony\\Component\\Console\\Exception\\CommandNotFoundException(code: 0): Command \"config:show\" is not defined.
+
+Did you mean one of these?
+    config:cache
+    config:clear
+    db:show
+    model:show at /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/symfony/console/Application.php:737)
+[stacktrace]
+#0 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/symfony/console/Application.php(266): Symfony\\Component\\Console\\Application->find()
+#1 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/symfony/console/Application.php(175): Symfony\\Component\\Console\\Application->doRun()
+#2 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Console/Application.php(102): Symfony\\Component\\Console\\Application->run()
+#3 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(155): Illuminate\\Console\\Application->run()
+#4 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/artisan(35): Illuminate\\Foundation\\Console\\Kernel->handle()
+#5 {main}
+"} 

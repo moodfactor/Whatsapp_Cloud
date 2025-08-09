@@ -657,7 +657,7 @@
             <div class="message-input-container">
                 <div class="message-input">
                     <div class="input-actions">
-                        <button class="action-btn attach-btn" id="attachBtn" onclick="openMediaDialog()" disabled>
+                        <button class="action-btn attach-btn" id="attachBtn" onclick="console.log('Attach button clicked!'); openMediaDialog();" disabled>
                             <i class="fas fa-paperclip"></i>
                         </button>
                     </div>
@@ -705,6 +705,14 @@
         // Load conversations on page load
         window.addEventListener('load', function() {
             loadConversations();
+            
+            // Debug: Check attach button state periodically
+            setInterval(() => {
+                const attachBtn = document.getElementById('attachBtn');
+                if (attachBtn && !attachBtn.disabled && currentConversation) {
+                    console.log('Attach button is ready - enabled:', !attachBtn.disabled, 'conversation:', currentConversation);
+                }
+            }, 3000);
         });
 
         async function loadConversations() {
@@ -814,7 +822,9 @@
             // Enable inputs
             document.getElementById('messageInput').disabled = false;
             document.getElementById('sendBtn').disabled = false;
-            document.getElementById('attachBtn').disabled = false;
+            const attachBtn = document.getElementById('attachBtn');
+            attachBtn.disabled = false;
+            console.log('Conversation selected, attach button enabled:', !attachBtn.disabled, 'conversation ID:', id);
             
             // Load messages
             await loadMessages(id);
@@ -839,6 +849,22 @@
                 
                 const data = await response.json();
                 const messages = data.messages || [];
+                
+                // Debug: Log all messages to see their structure
+                console.log('Loaded messages for conversation:', conversationId, messages);
+                messages.forEach((msg, index) => {
+                    if (msg.debug_type !== 'text') {
+                        console.log(`Message ${index}:`, {
+                            id: msg.id,
+                            text: msg.text,
+                            message_type: msg.message_type,
+                            debug_type: msg.debug_type,
+                            debug_has_url: msg.debug_has_url,
+                            media_url: msg.media_url,
+                            filename: msg.filename
+                        });
+                    }
+                });
 
                 const container = document.getElementById('messages');
                 

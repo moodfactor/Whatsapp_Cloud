@@ -327,6 +327,13 @@
                     <i class="fab fa-whatsapp"></i> WhatsApp Chat
                 </a>
             </div>
+            @if(in_array($admin->role ?? 'agent', ['super_admin', 'admin']))
+            <div class="nav-item">
+                <a href="{{ route('admin.whatsapp.settings') }}" class="nav-link">
+                    <i class="fas fa-cog"></i> WhatsApp Settings
+                </a>
+            </div>
+            @endif
         </nav>
         
         <div class="user-info">

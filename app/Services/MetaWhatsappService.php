@@ -419,4 +419,63 @@ class MetaWhatsappService
         }
         return $cleaned;
     }
+
+    /**
+     * Test WhatsApp access token validity
+     */
+    public function testAccessToken(string $token = null): array
+    {
+        try {
+            $accessToken = $token ?: config('whatsapp.access_token');
+            $phoneNumberId = config('whatsapp.phone_number_id');
+            
+            if (!$accessToken || !$phoneNumberId) {
+                throw new \Exception('WhatsApp configuration missing');
+            }
+
+            // Test token by making a request to get phone number info
+            $response = Http::withToken($accessToken)
+                ->get("https://graph.facebook.com/v17.0/{$phoneNumberId}");
+
+            $responseData = $response->json();
+            
+            if (!$response->successful()) {
+                $errorMessage = $responseData['error']['message'] ?? 'Unknown error';
+                
+                // Check if error is specifically about token expiration
+                if (isset($responseData['error']['code']) && $responseData['error']['code'] == 190) {
+                    return [
+                        'success' => false,
+                        'error' => 'Token expired: ' . $errorMessage,
+                        'expired' => true
+                    ];
+                }
+                
+                return [
+                    'success' => false,
+                    'error' => $errorMessage
+                ];
+            }
+
+            // Token is valid, try to get expiration info if available
+            $expiresAt = null;
+            if (isset($responseData['data_access_expires_at'])) {
+                $expiresAt = date('Y-m-d H:i:s', $responseData['data_access_expires_at']);
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Token is valid',
+                'expires_at' => $expiresAt,
+                'phone_info' => $responseData
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Token test error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
 }

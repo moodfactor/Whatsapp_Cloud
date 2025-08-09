@@ -10,9 +10,30 @@ function mediaUploadModal() {
         isUploading: false,
         
         openDialog(convId) {
+            console.log('Media modal openDialog called with:', convId);
             this.conversationId = convId;
             this.isOpen = true;
             this.resetForm();
+            console.log('Modal state set to open:', this.isOpen);
+            
+            // Test alert to confirm JavaScript is working
+            alert('Modal should be opening now! Check if you can see it.');
+            
+            // Force show modal after a short delay
+            setTimeout(() => {
+                const modalElement = document.querySelector('[x-show="isOpen"]');
+                console.log('Modal element found:', modalElement);
+                if (modalElement) {
+                    modalElement.style.display = 'flex !important';
+                    modalElement.style.visibility = 'visible !important';
+                    modalElement.style.position = 'fixed !important';
+                    modalElement.style.top = '0 !important';
+                    modalElement.style.left = '0 !important';
+                    modalElement.style.width = '100vw !important';
+                    modalElement.style.height = '100vh !important';
+                    console.log('Modal forced visible with explicit styles');
+                }
+            }, 100);
         },
         
         closeDialog() {
@@ -145,7 +166,8 @@ function mediaUploadModal() {
 
     <!-- Media Preview Dialog -->
     <div x-show="isOpen" 
-         class="fixed inset-0 z-50 overflow-y-auto"
+         class="fixed inset-0 overflow-y-auto"
+         style="z-index: 9999 !important; background: rgba(255,0,0,0.8) !important; display: flex !important; align-items: center !important; justify-content: center !important; position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;"
          x-transition:enter="ease-out duration-300"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"

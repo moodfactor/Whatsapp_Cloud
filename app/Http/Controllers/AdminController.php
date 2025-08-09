@@ -11,10 +11,17 @@ use App\Models\WhatsappAdmin;
 use App\Models\Conversation;
 use App\Models\WhatsAppInteractionMessage;
 use App\Services\CountryService;
+use App\Services\MetaWhatsappService;
 use Carbon\Carbon;
 
 class AdminController extends BaseController
 {
+    protected $whatsappService;
+
+    public function __construct(MetaWhatsappService $whatsappService)
+    {
+        $this->whatsappService = $whatsappService;
+    }
     public function showLogin()
     {
         return view('admin.login');
@@ -367,5 +374,131 @@ class AdminController extends BaseController
             'agent' => 'Agent',
             default => 'User'
         };
+    }
+
+    public function whatsappSettings()
+    {
+        $admin = Auth::guard('whatsapp_admin')->user();
+        
+        if (!in_array($admin->role, ['super_admin', 'admin'])) {
+            return redirect()->route('admin.dashboard')->with('error', 'Access denied.');
+        }
+        
+        // Check token status
+        $tokenStatus = $this->checkTokenStatus();
+        
+        return view('admin.whatsapp-settings', compact('admin', 'tokenStatus'));
+    }
+
+    public function updateWhatsappToken(Request $request)
+    {
+        $admin = Auth::guard('whatsapp_admin')->user();
+        
+        if (!in_array($admin->role, ['super_admin', 'admin'])) {
+            return redirect()->route('admin.dashboard')->with('error', 'Access denied.');
+        }
+        
+        $request->validate([
+            'access_token' => 'required|string|min:50',
+            'phone_number_id' => 'nullable|string'
+        ]);
+        
+        try {
+            // Test the new token first
+            $testResult = $this->whatsappService->testAccessToken($request->access_token);
+            
+            if (!$testResult['success']) {
+                return redirect()->back()
+                    ->with('error', 'Token validation failed: ' . $testResult['error'])
+                    ->withInput();
+            }
+            
+            // Update .env file
+            $this->updateEnvFile([
+                'WHATSAPP_ACCESS_TOKEN' => $request->access_token,
+                'META_API_TOKEN' => '"' . $request->access_token . '"'
+            ]);
+            
+            if ($request->phone_number_id) {
+                $this->updateEnvFile([
+                    'WHATSAPP_PHONE_NUMBER_ID' => $request->phone_number_id,
+                    'META_PHONE_NUMBER_ID' => '"' . $request->phone_number_id . '"'
+                ]);
+            }
+            
+            // Clear config cache
+            \Artisan::call('config:clear');
+            
+            return redirect()->back()->with('success', 'WhatsApp token updated successfully!');
+            
+        } catch (\Exception $e) {
+            \Log::error('WhatsApp token update failed: ' . $e->getMessage());
+            return redirect()->back()
+                ->with('error', 'Failed to update token: ' . $e->getMessage())
+                ->withInput();
+        }
+    }
+
+    public function testWhatsappToken(Request $request)
+    {
+        $admin = Auth::guard('whatsapp_admin')->user();
+        
+        if (!in_array($admin->role, ['super_admin', 'admin'])) {
+            return response()->json(['success' => false, 'error' => 'Access denied']);
+        }
+        
+        try {
+            $result = $this->whatsappService->testAccessToken();
+            return response()->json($result);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    private function checkTokenStatus()
+    {
+        try {
+            $result = $this->whatsappService->testAccessToken();
+            
+            if ($result['success']) {
+                return [
+                    'status' => 'valid',
+                    'message' => 'Token is valid',
+                    'expires_at' => $result['expires_at'] ?? null
+                ];
+            } else {
+                return [
+                    'status' => 'expired',
+                    'message' => 'Token is expired or invalid: ' . $result['error']
+                ];
+            }
+        } catch (\Exception $e) {
+            return [
+                'status' => 'unknown',
+                'message' => 'Could not verify token: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    private function updateEnvFile(array $data)
+    {
+        $envFile = base_path('.env');
+        $envContent = file_get_contents($envFile);
+        
+        foreach ($data as $key => $value) {
+            $pattern = "/^{$key}=.*/m";
+            $replacement = "{$key}={$value}";
+            
+            if (preg_match($pattern, $envContent)) {
+                $envContent = preg_replace($pattern, $replacement, $envContent);
+            } else {
+                $envContent .= "\n{$replacement}";
+            }
+        }
+        
+        file_put_contents($envFile, $envContent);
     }
 }

@@ -50,6 +50,11 @@ Route::middleware(['web', 'auth:whatsapp_admin'])->prefix('admin')->group(functi
         Route::get('/api/statistics', [ConversationManagementController::class, 'statistics'])->name('admin.conversations.stats');
     });
     
+    // WhatsApp Settings
+    Route::get('/whatsapp-settings', [AdminController::class, 'whatsappSettings'])->name('admin.whatsapp.settings');
+    Route::post('/whatsapp/update-token', [AdminController::class, 'updateWhatsappToken'])->name('admin.whatsapp.update-token');
+    Route::post('/whatsapp/test-token', [AdminController::class, 'testWhatsappToken'])->name('admin.whatsapp.test-token');
+    
     // API for authentication checks
     Route::get('/auth/check', [AdminController::class, 'checkAuth'])->name('admin.auth.check');
     
