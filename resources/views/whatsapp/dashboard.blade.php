@@ -6,6 +6,8 @@
     <title>WhatsApp Chat - {{ $user['name'] }}</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    @livewireStyles
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -337,6 +339,226 @@
         .file-input {
             display: none;
         }
+        
+        /* Media Message Styles */
+        .media-message {
+            position: relative;
+            max-width: 280px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: white;
+        }
+        
+        .media-message img {
+            width: 100%;
+            height: auto;
+            display: block;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        
+        .media-message img:hover {
+            transform: scale(1.02);
+        }
+        
+        .media-message video {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 12px;
+        }
+        
+        .media-message audio {
+            width: 100%;
+            height: 40px;
+        }
+        
+        .document-message {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #e9edef;
+            max-width: 300px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .document-message:hover {
+            background: #f8f9fa;
+            border-color: #25d366;
+        }
+        
+        .document-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        
+        .document-icon.pdf { background: #ff4757; color: white; }
+        .document-icon.word { background: #1e3d59; color: white; }
+        .document-icon.excel { background: #00a84f; color: white; }
+        .document-icon.default { background: #54656f; color: white; }
+        
+        .document-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .document-name {
+            font-weight: 500;
+            color: #111b21;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .document-size {
+            font-size: 12px;
+            color: #667781;
+            margin-top: 2px;
+        }
+        
+        /* Image Modal */
+        .image-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .image-modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .image-modal img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+        }
+        
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 10000;
+        }
+        
+        /* Loading states */
+        .loading-spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #25d366;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Audio message styles */
+        .audio-message {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: white;
+            border-radius: 12px;
+            max-width: 300px;
+        }
+        
+        .audio-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #25d366;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 16px;
+        }
+        
+        .audio-info {
+            flex: 1;
+        }
+        
+        .audio-name {
+            font-weight: 500;
+            color: #111b21;
+            font-size: 14px;
+        }
+        
+        .audio-duration {
+            font-size: 12px;
+            color: #667781;
+            margin-top: 2px;
+        }
+        
+        /* Video message styles */
+        .video-message {
+            position: relative;
+            max-width: 280px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: white;
+        }
+        
+        .video-thumbnail {
+            position: relative;
+            width: 100%;
+            cursor: pointer;
+        }
+        
+        .video-play-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            transition: all 0.2s ease;
+        }
+        
+        .video-play-button:hover {
+            background: rgba(0, 0, 0, 0.8);
+            transform: translate(-50%, -50%) scale(1.1);
+        }
+        
+        .media-caption {
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.05);
+            font-size: 14px;
+            color: #111b21;
+        }
         .status-indicator {
             font-size: 12px;
             margin-left: 4px;
@@ -425,20 +647,28 @@
             <div class="message-input-container">
                 <div class="message-input">
                     <div class="input-actions">
-                        <button class="action-btn attach-btn" id="attachBtn" onclick="document.getElementById('fileInput').click()" disabled>
+                        <button class="action-btn attach-btn" id="attachBtn" onclick="openMediaDialog()" disabled>
                             <i class="fas fa-paperclip"></i>
                         </button>
                     </div>
-                    <input type="text" id="messageInput" placeholder="Type a message..." disabled>
+                    <input type="text" id="messageInput" placeholder="Type a message..." disabled onkeypress="handleKeyPress(event)">
                     <div class="input-actions">
                         <button class="action-btn send-btn" onclick="sendMessage()" id="sendBtn" disabled>
                             <i class="fas fa-paper-plane"></i>
                         </button>
                     </div>
                 </div>
-                <input type="file" id="fileInput" class="file-input" accept="image/*,video/*,audio/*,.pdf,.doc,.docx" onchange="handleFileUpload(event)">
             </div>
         </div>
+    </div>
+
+    <!-- Media Preview Dialog (Livewire Component) -->
+    @livewire('media-preview-dialog')
+
+    <!-- Image Modal -->
+    <div class="image-modal" id="imageModal" onclick="closeImageModal()">
+        <div class="modal-close" onclick="closeImageModal()">&times;</div>
+        <img id="modalImage" src="" alt="Full size image">
     </div>
 
     <script>
@@ -620,22 +850,59 @@
                     div.className = `message ${msg.type}`;
                     
                     let messageContent = '';
+                    
+                    // Handle different media types
                     if (msg.message_type === 'image' && msg.media_url) {
                         messageContent = `
                             <div class="media-message">
                                 <img src="${msg.media_url}" alt="Image" onclick="openImageModal('${msg.media_url}')">
+                                ${msg.text && msg.text !== '[Image]' ? `<div class="media-caption">${escapeHtml(msg.text)}</div>` : ''}
+                                <div class="message-time">${msg.time} ${getStatusIcon(msg.status)}</div>
+                            </div>
+                        `;
+                    } else if (msg.message_type === 'video' && msg.media_url) {
+                        messageContent = `
+                            <div class="video-message">
+                                <video controls>
+                                    <source src="${msg.media_url}" type="video/mp4">
+                                    Your browser does not support the video tag.
+                                </video>
+                                ${msg.text && msg.text !== '[Video]' ? `<div class="media-caption">${escapeHtml(msg.text)}</div>` : ''}
+                                <div class="message-time">${msg.time} ${getStatusIcon(msg.status)}</div>
+                            </div>
+                        `;
+                    } else if (msg.message_type === 'audio' && msg.media_url) {
+                        messageContent = `
+                            <div class="audio-message">
+                                <div class="audio-icon">
+                                    <i class="fas fa-music"></i>
+                                </div>
+                                <div class="audio-info">
+                                    <div class="audio-name">${msg.filename || 'Audio'}</div>
+                                    <audio controls>
+                                        <source src="${msg.media_url}" type="audio/mpeg">
+                                        Your browser does not support the audio tag.
+                                    </audio>
+                                </div>
                                 <div class="message-time">${msg.time} ${getStatusIcon(msg.status)}</div>
                             </div>
                         `;
                     } else if (msg.message_type === 'document' && msg.media_url) {
+                        const docIcon = getDocumentIcon(msg.filename || '');
                         messageContent = `
-                            <div class="message-bubble">
-                                <i class="fas fa-file-alt" style="margin-right: 8px;"></i>
-                                <a href="${msg.media_url}" target="_blank" style="color: inherit;">${escapeHtml(msg.text)}</a>
+                            <div class="document-message" onclick="window.open('${msg.media_url}', '_blank')">
+                                <div class="document-icon ${docIcon.class}">
+                                    <i class="fas ${docIcon.icon}"></i>
+                                </div>
+                                <div class="document-info">
+                                    <div class="document-name">${msg.filename || msg.text || 'Document'}</div>
+                                    <div class="document-size">Document</div>
+                                </div>
                                 <div class="message-time">${msg.time} ${getStatusIcon(msg.status)}</div>
                             </div>
                         `;
                     } else {
+                        // Regular text message
                         messageContent = `
                             <div class="message-bubble">
                                 ${escapeHtml(msg.text).replace(/\n/g, '<br>')}
@@ -862,6 +1129,89 @@
             }
         }
 
+        // Media dialog functions
+        function openMediaDialog() {
+            if (!currentConversation) {
+                showError('Please select a conversation first');
+                return;
+            }
+            Livewire.emit('openMediaDialog', currentConversation);
+        }
+
+        // Image modal functions
+        function openImageModal(imageSrc) {
+            const modal = document.getElementById('imageModal');
+            const modalImage = document.getElementById('modalImage');
+            modalImage.src = imageSrc;
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeImageModal() {
+            const modal = document.getElementById('imageModal');
+            modal.classList.remove('active');
+            document.body.style.overflow = 'auto';
+        }
+
+        // Handle Enter key in message input
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        // Get document icon based on filename
+        function getDocumentIcon(filename) {
+            const ext = filename.split('.').pop()?.toLowerCase() || '';
+            
+            switch (ext) {
+                case 'pdf':
+                    return { icon: 'fa-file-pdf', class: 'pdf' };
+                case 'doc':
+                case 'docx':
+                    return { icon: 'fa-file-word', class: 'word' };
+                case 'xls':
+                case 'xlsx':
+                    return { icon: 'fa-file-excel', class: 'excel' };
+                case 'ppt':
+                case 'pptx':
+                    return { icon: 'fa-file-powerpoint', class: 'powerpoint' };
+                case 'txt':
+                    return { icon: 'fa-file-alt', class: 'text' };
+                default:
+                    return { icon: 'fa-file', class: 'default' };
+            }
+        }
+
+        // Livewire event listeners
+        document.addEventListener('DOMContentLoaded', function () {
+            // Listen for media sent event from Livewire
+            Livewire.on('mediaSent', message => {
+                // Add the message to the UI immediately
+                addMessageToUI(message);
+                
+                // Refresh messages to sync with server
+                setTimeout(() => {
+                    if (currentConversation) {
+                        loadMessages(currentConversation, true);
+                    }
+                }, 1000);
+            });
+
+            // Listen for error events from Livewire
+            Livewire.on('showError', message => {
+                showError(message);
+            });
+
+            // Close modal on escape key
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') {
+                    closeImageModal();
+                }
+            });
+        });
+
         function formatTimeAgo(dateString) {
             if (!dateString) return '';
             
@@ -947,5 +1297,7 @@
             }
         });
     </script>
+    
+    @livewireScripts
 </body>
 </html>

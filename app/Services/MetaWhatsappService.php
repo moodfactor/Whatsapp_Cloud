@@ -17,6 +17,8 @@ use BiztechEG\WhatsAppCloudApi\Models\WhatsAppMessage;
 use BiztechEG\WhatsAppCloudApi\InteractiveSessionManager;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 
 class MetaWhatsappService
 {
@@ -201,6 +203,204 @@ class MetaWhatsappService
         } catch (\Exception $e) {
             Log::error('Message logging error: ' . $e->getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Upload media file to Meta WhatsApp API and get media ID
+     */
+    public function uploadMediaFile(UploadedFile $file): array
+    {
+        try {
+            $accessToken = config('whatsapp.access_token');
+            $phoneNumberId = config('whatsapp.phone_number_id');
+            
+            if (!$accessToken || !$phoneNumberId) {
+                throw new \Exception('WhatsApp configuration missing');
+            }
+
+            // Prepare the media upload request
+            $response = Http::withToken($accessToken)
+                ->attach('file', file_get_contents($file->path()), $file->getClientOriginalName())
+                ->post("https://graph.facebook.com/v17.0/{$phoneNumberId}/media", [
+                    'type' => $file->getMimeType(),
+                    'messaging_product' => 'whatsapp'
+                ]);
+
+            $responseData = $response->json();
+            
+            if (!$response->successful() || !isset($responseData['id'])) {
+                Log::error('Media upload failed', ['response' => $responseData]);
+                throw new \Exception('Failed to upload media to Meta API: ' . ($responseData['error']['message'] ?? 'Unknown error'));
+            }
+
+            return [
+                'media_id' => $responseData['id'],
+                'success' => true
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Media upload exception: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Send media message with uploaded media ID
+     */
+    public function sendMediaMessageWithId(string $to, string $mediaId, string $mediaType, string $caption = '', string $filename = null): array
+    {
+        try {
+            $cleanPhone = $this->cleanPhoneNumber($to);
+            
+            $message = null;
+            switch ($mediaType) {
+                case 'image':
+                    $message = new ImageMessage($cleanPhone, $mediaId, $caption);
+                    break;
+                case 'video':
+                    $message = new VideoMessage($cleanPhone, $mediaId, $caption);
+                    break;
+                case 'document':
+                    $message = new DocumentMessage($cleanPhone, $mediaId, $caption, $filename);
+                    break;
+                case 'audio':
+                    $message = new AudioMessage($cleanPhone, $mediaId);
+                    break;
+            }
+
+            if (!$message) {
+                throw new \Exception('Unsupported media type: ' . $mediaType);
+            }
+
+            $result = $this->whatsapp->sendMessage($message);
+            
+            if ($result) {
+                return [
+                    'success' => true,
+                    'message_id' => is_array($result) && isset($result['messages']) ? $result['messages'][0]['id'] ?? null : null,
+                    'result' => $result
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => 'WhatsApp API returned false'
+                ];
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Send media message error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Download media from WhatsApp API
+     */
+    public function downloadMedia(string $mediaId): array
+    {
+        try {
+            $accessToken = config('whatsapp.access_token');
+            
+            if (!$accessToken) {
+                throw new \Exception('WhatsApp access token not configured');
+            }
+
+            // First, get the media URL
+            $response = Http::withToken($accessToken)
+                ->get("https://graph.facebook.com/v17.0/{$mediaId}");
+
+            if (!$response->successful()) {
+                throw new \Exception('Failed to get media URL from Meta API');
+            }
+
+            $mediaData = $response->json();
+            $mediaUrl = $mediaData['url'] ?? null;
+
+            if (!$mediaUrl) {
+                throw new \Exception('Media URL not found in API response');
+            }
+
+            // Download the actual media file
+            $mediaResponse = Http::withToken($accessToken)->get($mediaUrl);
+
+            if (!$mediaResponse->successful()) {
+                throw new \Exception('Failed to download media file');
+            }
+
+            // Generate filename
+            $extension = $this->getFileExtensionFromMimeType($mediaData['mime_type'] ?? 'application/octet-stream');
+            $filename = 'whatsapp_' . $mediaId . '_' . time() . '.' . $extension;
+            
+            // Store the file
+            $path = 'whatsapp_media/' . $filename;
+            Storage::disk('public')->put($path, $mediaResponse->body());
+            
+            return [
+                'success' => true,
+                'local_path' => $path,
+                'full_url' => Storage::disk('public')->url($path),
+                'filename' => $filename,
+                'mime_type' => $mediaData['mime_type'] ?? 'application/octet-stream',
+                'file_size' => $mediaData['file_size'] ?? strlen($mediaResponse->body())
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Media download error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Get file extension from MIME type
+     */
+    private function getFileExtensionFromMimeType(string $mimeType): string
+    {
+        $extensions = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+            'video/mp4' => 'mp4',
+            'video/3gpp' => '3gp',
+            'audio/mpeg' => 'mp3',
+            'audio/mp4' => 'm4a',
+            'audio/amr' => 'amr',
+            'audio/ogg' => 'ogg',
+            'application/pdf' => 'pdf',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
+            'text/plain' => 'txt'
+        ];
+
+        return $extensions[$mimeType] ?? 'bin';
+    }
+
+    /**
+     * Get media type from file extension
+     */
+    public function getMediaTypeFromExtension(string $extension): string
+    {
+        $extension = strtolower($extension);
+        
+        if (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+            return 'image';
+        } elseif (in_array($extension, ['mp4', '3gp', 'avi', 'mov'])) {
+            return 'video';
+        } elseif (in_array($extension, ['mp3', 'm4a', 'amr', 'ogg', 'wav'])) {
+            return 'audio';
+        } else {
+            return 'document';
         }
     }
 

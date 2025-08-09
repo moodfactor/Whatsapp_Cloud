@@ -9,6 +9,7 @@ use App\Models\Conversation;
 use App\Models\WhatsAppInteractionMessage;
 use App\Services\CountryService;
 use App\Services\MetaWhatsappService;
+use Illuminate\Support\Facades\Storage;
 
 class WhatsAppController extends BaseController
 {
@@ -145,7 +146,10 @@ class WhatsAppController extends BaseController
                     'message_type' => $message->type ?? 'text',
                     'time' => \Carbon\Carbon::parse($message->time_sent)->format('H:i'),
                     'status' => $message->status ?? 'delivered',
-                    'media_url' => $message->url ?? null
+                    'media_url' => $message->url ?? null,
+                    'filename' => $message->filename ?? null,
+                    'mime_type' => $message->mime_type ?? null,
+                    'file_size' => $message->file_size ?? null
                 ];
             });
         
@@ -260,59 +264,104 @@ class WhatsAppController extends BaseController
 
     public function uploadMedia(Request $request)
     {
-        $user = $this->getCurrentUser();
+        $admin = Auth::guard('whatsapp_admin')->user();
+        
+        if (!$admin) {
+            return response()->json(['error' => 'Not authenticated'], 401);
+        }
         
         $request->validate([
             'conversation_id' => 'required|exists:whatsapp_interactions,id',
-            'media' => 'required|file|mimes:jpg,jpeg,png,gif,pdf,doc,docx,mp3,mp4,wav|max:16384' // 16MB max
+            'media' => 'required|file|mimes:jpg,jpeg,png,gif,webp,pdf,doc,docx,mp3,mp4,wav,ogg,m4a,3gp|max:16384', // 16MB max
+            'caption' => 'nullable|string|max:1000'
         ]);
         
         $conversation = Conversation::findOrFail($request->conversation_id);
         
         // Check permissions
-        if (!$user['permissions']['can_see_all'] && $conversation->assigned_to !== $user['id']) {
+        if (!in_array($admin->role, ['super_admin', 'admin']) && $conversation->assigned_to !== $admin->id) {
             return response()->json(['error' => 'Access denied'], 403);
         }
         
         try {
-            // Store file
             $file = $request->file('media');
-            $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-            $path = $file->storeAs('whatsapp', $filename, 'public');
-            $fullUrl = asset('uploads/' . $path);
+            $caption = $request->input('caption', '');
             
-            // Send media via WhatsApp API
-            $result = $this->whatsappService->sendMedia(
+            // Get media type from file extension
+            $mediaType = $this->whatsappService->getMediaTypeFromExtension($file->getClientOriginalExtension());
+            
+            // Upload file to Meta WhatsApp API
+            $uploadResult = $this->whatsappService->uploadMediaFile($file);
+            
+            if (!$uploadResult['success']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Failed to upload media: ' . $uploadResult['error']
+                ], 500);
+            }
+            
+            // Send media message via WhatsApp API
+            $sendResult = $this->whatsappService->sendMediaMessageWithId(
                 $conversation->decrypted_phone,
-                $fullUrl,
+                $uploadResult['media_id'],
+                $mediaType,
+                $caption,
                 $file->getClientOriginalName()
             );
             
-            // Store message in database
+            if (!$sendResult['success']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Failed to send media: ' . $sendResult['error']
+                ], 500);
+            }
+            
+            // Store file locally for reference (optional, can be removed to save space)
+            $localFilename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+            $localPath = $file->storeAs('whatsapp_media', $localFilename, 'public');
+            $localUrl = Storage::disk('public')->url($localPath);
+            
+            // Create message record
             $message = WhatsAppInteractionMessage::create([
                 'interaction_id' => $conversation->id,
-                'message' => $file->getClientOriginalName(),
-                'type' => $this->getMediaType($file->getClientOriginalExtension()),
+                'message' => $caption ?: $file->getClientOriginalName(),
+                'type' => $mediaType,
                 'nature' => 'sent',
                 'status' => 'sent',
-                'url' => $fullUrl,
-                'time_sent' => now()
+                'url' => $localUrl,
+                'filename' => $file->getClientOriginalName(),
+                'mime_type' => $file->getMimeType(),
+                'file_size' => $file->getSize(),
+                'time_sent' => now(),
+                'whatsapp_message_id' => $sendResult['message_id'] ?? null
+            ]);
+            
+            // Update conversation
+            $conversation->update([
+                'last_message' => $caption ?: '[' . ucfirst($mediaType) . ']',
+                'last_msg_time' => now()
             ]);
             
             return response()->json([
                 'success' => true,
                 'message' => [
                     'id' => $message->id,
-                    'text' => $file->getClientOriginalName(),
+                    'text' => $message->message,
                     'type' => 'sent',
                     'message_type' => $message->type,
-                    'time' => $message->time_sent->format('H:i'),
-                    'media_url' => $fullUrl,
+                    'time' => \Carbon\Carbon::parse($message->time_sent)->format('H:i'),
+                    'media_url' => $message->url,
+                    'filename' => $message->filename,
                     'status' => 'sent'
                 ]
             ]);
             
         } catch (\Exception $e) {
+            \Log::error('Upload media exception:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return response()->json([
                 'success' => false,
                 'error' => 'Failed to send media: ' . $e->getMessage()
@@ -439,39 +488,49 @@ class WhatsAppController extends BaseController
             if (isset($messageData['messages'])) {
                 foreach ($messageData['messages'] as $message) {
                     $phoneNumber = $message['from'] ?? null;
-                    $messageText = $message['text']['body'] ?? null;
                     $messageType = $message['type'] ?? 'text';
                     $timestamp = $message['timestamp'] ?? time();
 
                     if ($phoneNumber) {
-                        // Find or create conversation
+                        // Find or create conversation - use receiver_id column as per database structure
                         $conversation = Conversation::firstOrCreate(
-                            ['phone_number' => $phoneNumber],
+                            ['receiver_id' => $phoneNumber],
                             [
                                 'contact_name' => $phoneNumber,
-                                'last_message' => $messageText ?: '[' . ucfirst($messageType) . ']',
+                                'last_message' => $this->getMessagePreview($message, $messageType),
                                 'last_msg_time' => now(),
                                 'status' => 'active'
                             ]
                         );
 
+                        // Handle different message types
+                        $messageData = $this->processIncomingMessageByType($message, $messageType);
+                        
                         // Create message record
-                        WhatsAppInteractionMessage::create([
-                            'conversation_id' => $conversation->id,
-                            'message' => $messageText ?: '[' . ucfirst($messageType) . ']',
+                        $dbMessage = WhatsAppInteractionMessage::create([
+                            'interaction_id' => $conversation->id,
+                            'message' => $messageData['text'],
+                            'type' => $messageType,
                             'nature' => 'received',
                             'status' => 'delivered',
                             'time_sent' => now(),
-                            'message_data' => json_encode($message)
+                            'url' => $messageData['media_url'] ?? null,
+                            'filename' => $messageData['filename'] ?? null,
+                            'mime_type' => $messageData['mime_type'] ?? null,
+                            'file_size' => $messageData['file_size'] ?? null,
+                            'metadata' => json_encode($message)
                         ]);
 
                         // Update conversation
                         $conversation->update([
-                            'last_message' => $messageText ?: '[' . ucfirst($messageType) . ']',
+                            'last_message' => $messageData['text'],
                             'last_msg_time' => now()
                         ]);
 
-                        \Log::info("Processed WhatsApp message from {$phoneNumber}");
+                        \Log::info("Processed WhatsApp {$messageType} message from {$phoneNumber}", [
+                            'message_id' => $dbMessage->id,
+                            'has_media' => !empty($messageData['media_url'])
+                        ]);
                     }
                 }
             }
@@ -496,6 +555,119 @@ class WhatsAppController extends BaseController
                 'data' => $messageData,
                 'trace' => $e->getTraceAsString()
             ]);
+        }
+    }
+
+    /**
+     * Process incoming message based on its type
+     */
+    private function processIncomingMessageByType(array $message, string $messageType): array
+    {
+        $result = [
+            'text' => '',
+            'media_url' => null,
+            'filename' => null,
+            'mime_type' => null,
+            'file_size' => null
+        ];
+
+        switch ($messageType) {
+            case 'text':
+                $result['text'] = $message['text']['body'] ?? '';
+                break;
+
+            case 'image':
+                $result['text'] = $message['image']['caption'] ?? '[Image]';
+                if (isset($message['image']['id'])) {
+                    $mediaData = $this->whatsappService->downloadMedia($message['image']['id']);
+                    if ($mediaData['success']) {
+                        $result['media_url'] = $mediaData['full_url'];
+                        $result['filename'] = $mediaData['filename'];
+                        $result['mime_type'] = $mediaData['mime_type'];
+                        $result['file_size'] = $mediaData['file_size'];
+                    }
+                }
+                break;
+
+            case 'document':
+                $result['text'] = $message['document']['caption'] ?? '[Document]';
+                $result['filename'] = $message['document']['filename'] ?? 'document';
+                if (isset($message['document']['id'])) {
+                    $mediaData = $this->whatsappService->downloadMedia($message['document']['id']);
+                    if ($mediaData['success']) {
+                        $result['media_url'] = $mediaData['full_url'];
+                        $result['mime_type'] = $mediaData['mime_type'];
+                        $result['file_size'] = $mediaData['file_size'];
+                    }
+                }
+                break;
+
+            case 'audio':
+                $result['text'] = '[Audio]';
+                if (isset($message['audio']['id'])) {
+                    $mediaData = $this->whatsappService->downloadMedia($message['audio']['id']);
+                    if ($mediaData['success']) {
+                        $result['media_url'] = $mediaData['full_url'];
+                        $result['filename'] = $mediaData['filename'];
+                        $result['mime_type'] = $mediaData['mime_type'];
+                        $result['file_size'] = $mediaData['file_size'];
+                    }
+                }
+                break;
+
+            case 'video':
+                $result['text'] = $message['video']['caption'] ?? '[Video]';
+                if (isset($message['video']['id'])) {
+                    $mediaData = $this->whatsappService->downloadMedia($message['video']['id']);
+                    if ($mediaData['success']) {
+                        $result['media_url'] = $mediaData['full_url'];
+                        $result['filename'] = $mediaData['filename'];
+                        $result['mime_type'] = $mediaData['mime_type'];
+                        $result['file_size'] = $mediaData['file_size'];
+                    }
+                }
+                break;
+
+            case 'sticker':
+                $result['text'] = '[Sticker]';
+                if (isset($message['sticker']['id'])) {
+                    $mediaData = $this->whatsappService->downloadMedia($message['sticker']['id']);
+                    if ($mediaData['success']) {
+                        $result['media_url'] = $mediaData['full_url'];
+                        $result['filename'] = $mediaData['filename'];
+                        $result['mime_type'] = $mediaData['mime_type'];
+                        $result['file_size'] = $mediaData['file_size'];
+                    }
+                }
+                break;
+
+            default:
+                $result['text'] = '[' . ucfirst($messageType) . ']';
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get a preview text for different message types
+     */
+    private function getMessagePreview(array $message, string $messageType): string
+    {
+        switch ($messageType) {
+            case 'text':
+                return $message['text']['body'] ?? '';
+            case 'image':
+                return $message['image']['caption'] ?? '[Image]';
+            case 'document':
+                return $message['document']['caption'] ?? '[Document]';
+            case 'audio':
+                return '[Audio]';
+            case 'video':
+                return $message['video']['caption'] ?? '[Video]';
+            case 'sticker':
+                return '[Sticker]';
+            default:
+                return '[' . ucfirst($messageType) . ']';
         }
     }
 }

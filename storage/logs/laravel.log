@@ -3985,3 +3985,39 @@
 #52 /home/u539863725/domains/al-najjarstore.com/public_html/connect/public/index.php(58): Illuminate\\Foundation\\Http\\Kernel->handle()
 #53 {main}
 "} 
+[2025-08-09 03:54:07] production.ERROR: Class "BiztechEG\WhatsAppCloudApi\Providers\WhatsAppServiceProvider" not found {"exception":"[object] (Error(code: 0): Class \"BiztechEG\\WhatsAppCloudApi\\Providers\\WhatsAppServiceProvider\" not found at /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/ProviderRepository.php:206)
+[stacktrace]
+#0 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/ProviderRepository.php(142): Illuminate\\Foundation\\ProviderRepository->createProvider()
+#1 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/ProviderRepository.php(61): Illuminate\\Foundation\\ProviderRepository->compileManifest()
+#2 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(689): Illuminate\\Foundation\\ProviderRepository->load()
+#3 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/Bootstrap/RegisterProviders.php(17): Illuminate\\Foundation\\Application->registerConfiguredProviders()
+#4 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(265): Illuminate\\Foundation\\Bootstrap\\RegisterProviders->bootstrap()
+#5 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(383): Illuminate\\Foundation\\Application->bootstrapWith()
+#6 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(153): Illuminate\\Foundation\\Console\\Kernel->bootstrap()
+#7 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/artisan(35): Illuminate\\Foundation\\Console\\Kernel->handle()
+#8 {main}
+"} 
+[2025-08-09 03:56:45] production.ERROR: Class "BiztechEG\WhatsAppCloudApi\Providers\WhatsAppServiceProvider" not found {"exception":"[object] (Error(code: 0): Class \"BiztechEG\\WhatsAppCloudApi\\Providers\\WhatsAppServiceProvider\" not found at /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/ProviderRepository.php:206)
+[stacktrace]
+#0 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/ProviderRepository.php(142): Illuminate\\Foundation\\ProviderRepository->createProvider()
+#1 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/ProviderRepository.php(61): Illuminate\\Foundation\\ProviderRepository->compileManifest()
+#2 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(689): Illuminate\\Foundation\\ProviderRepository->load()
+#3 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/Bootstrap/RegisterProviders.php(17): Illuminate\\Foundation\\Application->registerConfiguredProviders()
+#4 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(265): Illuminate\\Foundation\\Bootstrap\\RegisterProviders->bootstrap()
+#5 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(383): Illuminate\\Foundation\\Application->bootstrapWith()
+#6 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(153): Illuminate\\Foundation\\Console\\Kernel->bootstrap()
+#7 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/artisan(35): Illuminate\\Foundation\\Console\\Kernel->handle()
+#8 {main}
+"} 
+[2025-08-09 04:00:59] production.ERROR: Class "BiztechEG\WhatsAppCloudApi\Providers\WhatsAppServiceProvider" not found {"exception":"[object] (Error(code: 0): Class \"BiztechEG\\WhatsAppCloudApi\\Providers\\WhatsAppServiceProvider\" not found at /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/ProviderRepository.php:206)
+[stacktrace]
+#0 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/ProviderRepository.php(142): Illuminate\\Foundation\\ProviderRepository->createProvider()
+#1 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/ProviderRepository.php(61): Illuminate\\Foundation\\ProviderRepository->compileManifest()
+#2 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(689): Illuminate\\Foundation\\ProviderRepository->load()
+#3 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/Bootstrap/RegisterProviders.php(17): Illuminate\\Foundation\\Application->registerConfiguredProviders()
+#4 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(265): Illuminate\\Foundation\\Bootstrap\\RegisterProviders->bootstrap()
+#5 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(383): Illuminate\\Foundation\\Application->bootstrapWith()
+#6 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(153): Illuminate\\Foundation\\Console\\Kernel->bootstrap()
+#7 /mnt/9cb07da1-5c04-4b0f-bc5e-9f868d5484e6/play/developoer/journals_dev/whatsapp-microservice/connect/artisan(35): Illuminate\\Foundation\\Console\\Kernel->handle()
+#8 {main}
+"} 
