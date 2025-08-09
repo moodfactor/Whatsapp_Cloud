@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Media Upload Test</title>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-container { max-width: 800px; margin: 0 auto; }
+        .button { padding: 10px 20px; background: #25d366; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .button:hover { background: #1da851; }
+        .result { margin-top: 20px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>WhatsApp Media Upload Test</h1>
+        
+        <div x-data="{
+            conversationId: 1,
+            testOpenDialog() {
+                console.log('Testing media dialog open...');
+                window.dispatchEvent(new CustomEvent('open-simple-media-dialog', {
+                    detail: { conversationId: this.conversationId }
+                }));
+            }
+        }">
+            <p>This page tests the media upload functionality without the full WhatsApp interface.</p>
+            
+            <div style="margin: 20px 0;">
+                <label>Conversation ID: </label>
+                <input type="number" x-model="conversationId" style="padding: 5px; border: 1px solid #ccc;">
+            </div>
+            
+            <button @click="testOpenDialog()" class="button">
+                <i class="fas fa-paperclip"></i> Test Media Dialog
+            </button>
+            
+            <div class="result">
+                <strong>Instructions:</strong>
+                <ol>
+                    <li>Click the "Test Media Dialog" button above</li>
+                    <li>The media upload dialog should appear</li>
+                    <li>Select a file and test the upload process</li>
+                    <li>Check browser console for any errors</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- Include the media upload modal -->
+        <div x-data="{ 
+                isOpen: false, 
+                selectedFile: null, 
+                caption: '', 
+                conversationId: null,
+                previewData: null,
+                isUploading: false,
+                
+                openDialog(convId) {
+                    console.log('Opening dialog for conversation:', convId);
+                    this.conversationId = convId;
+                    this.isOpen = true;
+                    this.resetForm();
+                },
+                
+                closeDialog() {
+                    this.isOpen = false;
+                    this.resetForm();
+                },
+                
+                resetForm() {
+                    this.selectedFile = null;
+                    this.caption = '';
+                    this.previewData = null;
+                    this.isUploading = false;
+                },
+                
+                handleFileSelection(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    
+                    console.log('File selected:', file.name);
+                    
+                    // Validate file size (16MB)
+                    if (file.size > 16 * 1024 * 1024) {
+                        alert('File size must be less than 16MB');
+                        return;
+                    }
+                    
+                    this.selectedFile = file;
+                    this.generatePreview();
+                },
+                
+                generatePreview() {
+                    if (!this.selectedFile) return;
+                    
+                    console.log('Generating preview...');
+                    const extension = this.selectedFile.name.split('.').pop().toLowerCase();
+                    const size = this.formatFileSize(this.selectedFile.size);
+                    
+                    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension)) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            this.previewData = {
+                                type: 'image',
+                                url: e.target.result,
+                                filename: this.selectedFile.name,
+                                size: size
+                            };
+                        };
+                        reader.readAsDataURL(this.selectedFile);
+                    } else {
+                        this.previewData = {
+                            type: 'document',
+                            filename: this.selectedFile.name,
+                            size: size,
+                            icon: this.getFileIcon(extension)
+                        };
+                    }
+                },
+                
+                getFileIcon(extension) {
+                    const icons = {
+                        'pdf': 'fa-file-pdf',
+                        'doc': 'fa-file-word',
+                        'docx': 'fa-file-word',
+                        'mp3': 'fa-file-audio',
+                        'mp4': 'fa-file-video',
+                        'default': 'fa-file'
+                    };
+                    return icons[extension] || icons.default;
+                },
+                
+                formatFileSize(bytes) {
+                    const units = ['B', 'KB', 'MB', 'GB'];
+                    let size = bytes;
+                    let unitIndex = 0;
+                    while (size >= 1024 && unitIndex < units.length - 1) {
+                        size /= 1024;
+                        unitIndex++;
+                    }
+                    return Math.round(size * 100) / 100 + ' ' + units[unitIndex];
+                },
+                
+                async uploadMedia() {
+                    alert('Test mode - upload function would work here with conversation ID: ' + this.conversationId);
+                    console.log('Would upload:', this.selectedFile, 'with caption:', this.caption);
+                    this.closeDialog();
+                }
+            }"
+            x-cloak
+            @open-simple-media-dialog.window="openDialog($event.detail.conversationId)">
+
+            <!-- File Input (Hidden) -->
+            <input type="file" 
+                   x-ref="fileInput"
+                   @change="handleFileSelection($event)"
+                   accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.mp3,.mp4,.wav,.ogg,.m4a,.3gp"
+                   style="display: none;">
+
+            <!-- Media Preview Dialog -->
+            <div x-show="isOpen" 
+                 class="fixed inset-0 z-50 overflow-y-auto"
+                 style="background: rgba(0,0,0,0.8);">
+                
+                <!-- Dialog container -->
+                <div class="flex items-center justify-center min-h-screen p-4">
+                    <div class="relative bg-white rounded-lg shadow-xl max-w-2xl w-full">
+                        
+                        <!-- Dialog Header -->
+                        <div class="flex items-center justify-between p-4 border-b">
+                            <h3 class="text-lg font-semibold">Send Media (Test Mode)</h3>
+                            <button @click="closeDialog()" 
+                                    class="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100">
+                                <span style="font-size: 20px;">&times;</span>
+                            </button>
+                        </div>
+
+                        <!-- Dialog Body -->
+                        <div class="p-6">
+                            <div x-show="!selectedFile" class="text-center py-12">
+                                <p class="mb-4">Select a file to send</p>
+                                <button @click="$refs.fileInput.click()" 
+                                        class="button">
+                                    Choose File
+                                </button>
+                            </div>
+
+                            <div x-show="selectedFile">
+                                <!-- Preview Area -->
+                                <div class="bg-gray-50 rounded-lg p-6 text-center mb-4">
+                                    <div x-show="previewData && previewData.type === 'image'">
+                                        <img :src="previewData ? previewData.url : ''" 
+                                             alt="Preview" 
+                                             class="max-w-full max-h-80 mx-auto rounded-lg">
+                                    </div>
+                                    <div x-show="previewData && previewData.type !== 'image'" class="flex flex-col items-center">
+                                        <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                                            <i :class="previewData ? 'fas ' + previewData.icon + ' text-blue-600 text-2xl' : ''"></i>
+                                        </div>
+                                        <p class="font-medium" x-text="previewData ? previewData.filename : ''"></p>
+                                        <p class="text-sm text-gray-500" x-text="previewData ? previewData.size : ''"></p>
+                                    </div>
+                                </div>
+
+                                <!-- Caption Input -->
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium mb-2">Caption (optional)</label>
+                                    <textarea x-model="caption"
+                                              rows="3"
+                                              class="w-full px-3 py-2 border rounded-lg"
+                                              placeholder="Add a caption..."></textarea>
+                                </div>
+                                
+                                <button @click="$refs.fileInput.click()" 
+                                        class="button mb-4">
+                                    Change File
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Dialog Footer -->
+                        <div x-show="selectedFile" class="flex justify-end space-x-3 p-4 border-t bg-gray-50">
+                            <button @click="closeDialog()" 
+                                    class="px-4 py-2 border rounded-lg">
+                                Cancel
+                            </button>
+                            <button @click="uploadMedia()" 
+                                    class="button">
+                                Send (Test)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

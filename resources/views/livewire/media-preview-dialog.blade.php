@@ -1,4 +1,7 @@
-<div x-data="mediaPreviewHandler()" x-cloak>
+<div x-data="mediaPreviewHandler()" x-cloak
+     @open-media-dialog.window="handleOpenDialog($event.detail)"
+     @close-media-dialog.window="$wire.closeDialog()"
+     x-init="initializeComponent()">
     <!-- File Input (Hidden) -->
     <input type="file" 
            x-ref="fileInput"
@@ -161,6 +164,17 @@
     <script>
         function mediaPreviewHandler() {
             return {
+                initializeComponent() {
+                    // Component initialization
+                    console.log('Media Preview Dialog initialized');
+                },
+                
+                handleOpenDialog(detail) {
+                    if (detail && detail.conversationId) {
+                        this.$wire.openDialog(detail.conversationId);
+                    }
+                },
+                
                 handleFileSelection(event) {
                     const file = event.target.files[0];
                     if (file) {

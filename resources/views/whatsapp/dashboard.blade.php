@@ -7,7 +7,6 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    @livewireStyles
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -662,8 +661,8 @@
         </div>
     </div>
 
-    <!-- Media Preview Dialog (Livewire Component) -->
-    @livewire('media-preview-dialog')
+    <!-- Media Upload Modal (Simple Alpine.js) -->
+    @include('components.media-upload-modal')
 
     <!-- Image Modal -->
     <div class="image-modal" id="imageModal" onclick="closeImageModal()">
@@ -1135,7 +1134,11 @@
                 showError('Please select a conversation first');
                 return;
             }
-            Livewire.emit('openMediaDialog', currentConversation);
+            
+            // Use Alpine.js event system (simple and reliable)
+            window.dispatchEvent(new CustomEvent('open-simple-media-dialog', {
+                detail: { conversationId: currentConversation }
+            }));
         }
 
         // Image modal functions
@@ -1184,10 +1187,18 @@
             }
         }
 
-        // Livewire event listeners
+        // Event listeners
         document.addEventListener('DOMContentLoaded', function () {
-            // Listen for media sent event from Livewire
-            Livewire.on('mediaSent', message => {
+            // Close modal on escape key
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') {
+                    closeImageModal();
+                }
+            });
+
+            // Listen for media sent event (from simple modal)
+            window.addEventListener('media-sent', function(event) {
+                const message = event.detail;
                 // Add the message to the UI immediately
                 addMessageToUI(message);
                 
@@ -1199,17 +1210,23 @@
                 }, 1000);
             });
 
-            // Listen for error events from Livewire
-            Livewire.on('showError', message => {
-                showError(message);
-            });
+            // Optional: Listen for Livewire events if available (for backward compatibility)
+            if (typeof Livewire !== 'undefined') {
+                document.addEventListener('livewire:load', function () {
+                    Livewire.on('mediaSent', message => {
+                        addMessageToUI(message);
+                        setTimeout(() => {
+                            if (currentConversation) {
+                                loadMessages(currentConversation, true);
+                            }
+                        }, 1000);
+                    });
 
-            // Close modal on escape key
-            document.addEventListener('keydown', function(event) {
-                if (event.key === 'Escape') {
-                    closeImageModal();
-                }
-            });
+                    Livewire.on('showError', message => {
+                        showError(message);
+                    });
+                });
+            }
         });
 
         function formatTimeAgo(dateString) {
@@ -1297,7 +1314,5 @@
             }
         });
     </script>
-    
-    @livewireScripts
 </body>
 </html>
